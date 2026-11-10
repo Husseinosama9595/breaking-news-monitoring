@@ -15,18 +15,27 @@ function clone(value) {
 
 function matches(account, filter) {
   return Object.entries(filter).every(([key, expected]) => {
+    if (key === '$and') return expected.every((clause) => matches(account, clause));
+    if (key === '$or') return expected.some((clause) => matches(account, clause));
     if (key === '_id' && expected && typeof expected === 'object' && '$ne' in expected) {
       return account._id !== String(expected.$ne);
     }
+    if (expected && typeof expected === 'object' && '$exists' in expected) return expected.$exists ? key in account : !(key in account);
+    if (expected && typeof expected === 'object' && '$regex' in expected) return new RegExp(expected.$regex, expected.$options).test(String(account[key] ?? ''));
+    if (expected === null) return account[key] == null;
     return String(account[key]) === String(expected);
   });
 }
 
 function query(operation) {
+  let offset = 0;
+  let pageSize = Number.POSITIVE_INFINITY;
   return {
     select() { return this; },
     sort() { return this; },
-    async lean() { return clone(await operation()); },
+    skip(value) { offset = value; return this; },
+    limit(value) { pageSize = value; return this; },
+    async lean() { const result = await operation(); return clone(Array.isArray(result) ? result.slice(offset, offset + pageSize) : result); },
   };
 }
 
@@ -34,6 +43,7 @@ const accountModel = {
   find(filter) { return query(() => accounts.filter((account) => matches(account, filter))); },
   findOne(filter) { return query(() => accounts.find((account) => matches(account, filter)) ?? null); },
   findById(id) { return query(() => accounts.find((account) => account._id === String(id)) ?? null); },
+  async countDocuments(filter) { return accounts.filter((account) => matches(account, filter)).length; },
   findOneAndUpdate(filter, update) {
     return query(() => {
       const account = accounts.find((item) => matches(item, filter));
@@ -67,14 +77,14 @@ const accountModel = {
 const controller = createAccountController({ accountModel, registry, providerMode: 'account' });
 const router = createAccountRouter({ accountModel, registry, providerMode: 'account' });
 
-async function invoke(handler, { id, body } = {}) {
+async function invoke(handler, { id, body, query = {} } = {}) {
   const response = {
     statusCode: 200,
     payload: undefined,
     status(code) { this.statusCode = code; return this; },
     json(payload) { this.payload = payload; return this; },
   };
-  await handler({ params: { id }, body }, response);
+  await handler({ params: { id }, body, query }, response);
   return { status: response.statusCode, body: response.payload };
 }
 
@@ -144,6 +154,25 @@ test('creates and lists an account with schema defaults and a pending Nitter bas
     freshnessMaxAgeMs: listed.body.accounts[0].pollHealth.freshnessMaxAgeMs,
   });
   assert.equal('lastError' in listed.body.accounts[0], false, 'internal error text is not exposed');
+});
+
+test('supports country assignment and filtering without exposing or resetting the Nitter baseline', async () => {
+  const created = await invoke(controller.create, { body: { username: 'CountrySource', countryCode: 'ir' } });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.account.countryCode, 'IR');
+  assert.equal(created.body.account.countryName, 'Iran');
+  const account = accounts[0];
+  account.notificationBaselineAt = new Date('2026-11-10T10:00:00.000Z');
+  const updated = await invoke(controller.update, { id: account._id, body: { countryCode: 'US' } });
+  assert.equal(updated.body.account.countryCode, 'US');
+  assert.equal(account.notificationBaselineAt.toISOString(), '2026-11-10T10:00:00.000Z');
+  assert.equal((await invoke(controller.list, { query: { country: 'US' } })).body.accounts.length, 1);
+  assert.equal((await invoke(controller.list, { query: { country: 'unassigned' } })).body.accounts.length, 0);
+});
+
+test('rejects country assignments that are not valid ISO alpha-2 codes', async () => {
+  assert.equal((await invoke(controller.create, { body: { username: 'InvalidCode', countryCode: 'ZZ' } })).status, 400);
+  assert.equal((await invoke(controller.create, { body: { username: 'InvalidCode', countryCode: ['IR'] } })).status, 400);
 });
 
 test('retrieves one account and returns 404 for a missing account', async () => {
@@ -250,4 +279,46 @@ test('prevents duplicate usernames regardless of case or leading @', async () =>
   });
   assert.equal(duplicateUpdate.status, 409);
   assert.equal(accounts.length, 2);
+});
+
+test('searches usernames and display names case-insensitively with partial and optional-@ matching', async () => {
+  await invoke(controller.create, { body: { username: 'realDonaldTrump', displayName: 'Donald Trump' } });
+  await invoke(controller.create, { body: { username: 'CNN', displayName: 'Cable News Network' } });
+  await invoke(controller.create, { body: { username: 'elonmusk', displayName: 'Elon Musk' } });
+  for (const search of ['trum', 'TRUM', '@trum', 'donald tr']) {
+    const response = await invoke(controller.list, { query: { search: `  ${search}  ` } });
+    assert.deepEqual(response.body.accounts.map((account) => account.username), ['realDonaldTrump']);
+  }
+  for (const search of ['elonmusk', 'elon', 'ELON', '@elon', '@elonmusk', '  elon  ']) {
+    const response = await invoke(controller.list, { query: { search } });
+    assert.deepEqual(response.body.accounts.map((account) => account.username), ['elonmusk'], `search=${search}`);
+  }
+  assert.deepEqual((await invoke(controller.list, { query: { search: '@cnn' } })).body.accounts.map((account) => account.username), ['CNN']);
+  assert.deepEqual((await invoke(controller.list, { query: { search: '.*' } })).body.accounts, [], 'regex metacharacters are treated literally');
+  assert.equal((await invoke(controller.list, { query: { search: '   ' } })).body.accounts.length, 3);
+});
+
+test('combines account search with country and unassigned filters on the server', async () => {
+  await invoke(controller.create, { body: { username: 'IranDesk', displayName: 'Tehran Monitor', countryCode: 'IR' } });
+  await invoke(controller.create, { body: { username: 'IranAnalyst', displayName: 'Unassigned Iran source' } });
+  await invoke(controller.create, { body: { username: 'OtherSource', countryCode: 'US' } });
+  assert.deepEqual((await invoke(controller.list, { query: { country: 'IR', search: 'iran' } })).body.accounts.map((account) => account.username), ['IranDesk']);
+  assert.deepEqual((await invoke(controller.list, { query: { country: 'unassigned', search: 'IRAN' } })).body.accounts.map((account) => account.username), ['IranAnalyst']);
+  assert.deepEqual((await invoke(controller.list, { query: { country: 'US', search: 'iran' } })).body.accounts, []);
+});
+
+test('paginates account search results and reports the filtered result count', async () => {
+  for (const username of ['SourceOne', 'SourceTwo', 'SourceThree']) {
+    await invoke(controller.create, { body: { username, displayName: 'Shared News Desk' } });
+  }
+  const first = await invoke(controller.list, { query: { search: 'news', page: '1', limit: '2' } });
+  const second = await invoke(controller.list, { query: { search: 'NEWS', page: '2', limit: '2' } });
+  assert.deepEqual(first.body.pagination, { page: 1, limit: 2, total: 3, totalPages: 2 });
+  assert.deepEqual(second.body.pagination, { page: 2, limit: 2, total: 3, totalPages: 2 });
+  assert.equal(first.body.accounts.length, 2);
+  assert.equal(second.body.accounts.length, 1);
+  assert.equal((await invoke(controller.list, { query: { page: '1', limit: '101' } })).status, 400);
+  assert.equal((await invoke(controller.list, { query: { search: ['Reuters', 'CNN'] } })).status, 400);
+  assert.equal((await invoke(controller.list, { query: { search: 'x'.repeat(121) } })).status, 400);
+  assert.equal((await invoke(controller.list, { query: { status: 'unknown' } })).status, 400);
 });

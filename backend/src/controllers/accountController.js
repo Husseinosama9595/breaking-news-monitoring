@@ -2,9 +2,11 @@ import mongoose from 'mongoose';
 import MonitoredAccount, { ACCOUNT_CATEGORIES } from '../models/MonitoredAccount.js';
 import providerRegistry from '../providers/providerRegistry.js';
 import { env } from '../config/environment.js';
+import { countryNameForCode, normalizeCountryCode } from '../data/countryCatalog.js';
+import { escapeRegexLiteral, normalizeSearchTerm } from '../utils/searchText.js';
 
 const PUBLIC_FIELDS = [
-  '_id', 'platform', 'username', 'displayName', 'category', 'enabled',
+  '_id', 'platform', 'username', 'displayName', 'category', 'countryCode', 'enabled',
   'providerName', 'monitoringStatus', 'lastSuccessfulFetchAt', 'createdAt', 'updatedAt',
 ];
 const POLL_HEALTH_SELECT = [
@@ -15,9 +17,62 @@ const POLL_HEALTH_SELECT = [
   'lastProviderFeedFreshnessStatus',
 ].join(' ');
 const PUBLIC_SELECT = `${PUBLIC_FIELDS.filter((field) => field !== '_id').join(' ')} ${POLL_HEALTH_SELECT}`;
-const CREATE_FIELDS = new Set(['username', 'displayName', 'category', 'providerName']);
+const CREATE_FIELDS = new Set(['username', 'displayName', 'category', 'countryCode', 'providerName']);
 const UPDATE_FIELDS = CREATE_FIELDS;
 const USERNAME_PATTERN = /^[A-Za-z0-9_]{1,15}$/;
+const MAX_SEARCH_LENGTH = 120;
+const MAX_PAGE_SIZE = 100;
+
+function parsePagination(query) {
+  const requested = query.page !== undefined || query.limit !== undefined;
+  if (!requested) return { value: null };
+  const page = query.page === undefined ? 1 : Number(query.page);
+  const limit = query.limit === undefined ? 20 : Number(query.limit);
+  if (typeof query.page !== 'undefined' && (typeof query.page !== 'string' || !/^[1-9]\d*$/.test(query.page))) return { error: 'page must be a positive integer' };
+  if (typeof query.limit !== 'undefined' && (typeof query.limit !== 'string' || !/^[1-9]\d*$/.test(query.limit))) return { error: 'limit must be a positive integer' };
+  if (!Number.isSafeInteger(page) || !Number.isSafeInteger(limit)) return { error: 'page and limit must be safe integers' };
+  if (limit > MAX_PAGE_SIZE) return { error: `limit must be ${MAX_PAGE_SIZE} or fewer` };
+  if (!Number.isSafeInteger((page - 1) * limit)) return { error: 'page and limit produce an unsafe pagination offset' };
+  return { value: { page, limit, skip: (page - 1) * limit } };
+}
+
+function parseListQuery(query) {
+  const filter = { platform: 'x' };
+  const and = [];
+  if (query.country !== undefined) {
+    if (typeof query.country !== 'string') return { error: 'country must be an ISO alpha-2 code or unassigned' };
+    if (query.country.toLowerCase() === 'unassigned') and.push({ $or: [{ countryCode: null }, { countryCode: { $exists: false } }] });
+    else {
+      const countryResult = normalizeCountryCode(query.country);
+      if (countryResult.error) return { error: 'country must be a valid ISO 3166-1 alpha-2 code or unassigned' };
+      filter.countryCode = countryResult.value;
+    }
+  }
+  if (query.search !== undefined) {
+    if (typeof query.search !== 'string') return { error: 'search must be a single text value' };
+    if (query.search.length > MAX_SEARCH_LENGTH) return { error: `search must be ${MAX_SEARCH_LENGTH} characters or fewer` };
+    const term = normalizeSearchTerm(query.search);
+    if (term) {
+      const regex = escapeRegexLiteral(term);
+      and.push({ $or: [
+        { username: { $regex: regex, $options: 'i' } },
+        { displayName: { $regex: regex, $options: 'i' } },
+      ] });
+    }
+  }
+  if (query.status !== undefined) {
+    if (typeof query.status !== 'string' || !['enabled', 'disabled', 'error'].includes(query.status)) {
+      return { error: 'status must be enabled, disabled, or error' };
+    }
+    if (query.status === 'enabled') filter.enabled = true;
+    else if (query.status === 'disabled') filter.enabled = false;
+    else filter.monitoringStatus = 'error';
+  }
+  if (and.length) filter.$and = and;
+  const pagination = parsePagination(query);
+  if (pagination.error) return pagination;
+  return { value: { filter, pagination: pagination.value } };
+}
 
 function accountDto(account) {
   if (!account) return null;
@@ -25,6 +80,8 @@ function accountDto(account) {
   const dto = Object.fromEntries(PUBLIC_FIELDS
     .filter((field) => source[field] !== undefined)
     .map((field) => [field, source[field]]));
+  dto.countryCode = source.countryCode ?? null;
+  dto.countryName = countryNameForCode(dto.countryCode);
   dto.pollHealth = {
     lastStartedAt: source.lastPollAttemptAt ?? null,
     lastCompletedAt: source.lastPollCompletedAt ?? null,
@@ -77,6 +134,11 @@ function parseOptionalFields(body, { providerNames }) {
     }
     fields.category = body.category;
   }
+  if (Object.hasOwn(body, 'countryCode')) {
+    const countryResult = normalizeCountryCode(body.countryCode);
+    if (countryResult.error) return countryResult;
+    fields.countryCode = countryResult.value;
+  }
   if (Object.hasOwn(body, 'providerName')) {
     if (typeof body.providerName !== 'string' || !providerNames.includes(body.providerName)) {
       return { error: `providerName must be one of: ${providerNames.join(', ')}` };
@@ -112,11 +174,22 @@ export function createAccountController({
     return accountModel.findOne(filter).select('_id').lean();
   }
 
-  async function list(_req, res) {
+  async function list(req, res) {
+    const parsed = parseListQuery(req.query ?? {});
+    if (parsed.error) return validationError(res, parsed.error);
+    const { filter, pagination } = parsed.value;
     try {
-      const accounts = await accountModel.find({ platform: 'x' })
-        .select(PUBLIC_SELECT).sort({ createdAt: -1, _id: -1 }).lean();
-      return res.json({ accounts: accounts.map(accountDto) });
+      let query = accountModel.find(filter).select(PUBLIC_SELECT).sort({ createdAt: -1, _id: -1 });
+      if (!pagination) {
+        const accounts = await query.lean();
+        return res.json({ accounts: accounts.map(accountDto) });
+      }
+      query = query.skip(pagination.skip).limit(pagination.limit);
+      const [accounts, total] = await Promise.all([query.lean(), accountModel.countDocuments(filter)]);
+      return res.json({
+        accounts: accounts.map(accountDto),
+        pagination: { page: pagination.page, limit: pagination.limit, total, totalPages: total === 0 ? 0 : Math.ceil(total / pagination.limit) },
+      });
     } catch {
       return sendServerError(res);
     }
@@ -160,6 +233,7 @@ export function createAccountController({
         normalizedUsername,
         displayName: optionalResult.value.displayName ?? null,
         category: optionalResult.value.category ?? 'Other',
+        countryCode: optionalResult.value.countryCode ?? null,
         enabled: true,
         providerName,
         monitoringStatus: 'active',

@@ -27,6 +27,11 @@ export const routes: Routes = [
         data: { pageHeading: 'Monitored Accounts', pageSection: 'SOURCES' },
       },
       {
+        path: 'countries/:countryCode',
+        loadComponent: () => import('./features/countries/country-feed-page.component').then((module) => module.CountryFeedPageComponent),
+        data: { pageHeading: 'Country Feed', pageSection: 'COUNTRY MONITORING' },
+      },
+      {
         path: 'posts',
         loadComponent: () => import('./features/posts/posts-page.component').then((module) => module.PostsPageComponent),
         title: 'Live Feed | Breaking News Monitor',

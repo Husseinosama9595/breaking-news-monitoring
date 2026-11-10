@@ -1,0 +1,28 @@
+<main class="country-page">
+  <header class="country-heading">
+    <div><div class="eyebrow">COUNTRY MONITORING</div><h2><span class="country-flag">{{ flag(summary()?.countryCode) }}</span> {{ summary()?.countryName || (countryCode() === 'UNASSIGNED' ? 'Unassigned sources' : countryCode()) }}</h2><p>Posts and source health are grouped by the account’s current country assignment.</p></div>
+    <a routerLink="/accounts" [queryParams]="{country: countryCode() === 'UNASSIGNED' ? 'unassigned' : countryCode()}" class="manage-link">Manage accounts <i class="bi bi-arrow-up-right"></i></a>
+  </header>
+  @if (errorMessage()) { <section class="country-state error-state" role="alert"><p>{{ errorMessage() }}</p><button type="button" (click)="load(true)">Retry</button></section> }
+  @if (loading() && !summary()) { <section class="country-state" role="status"><span class="spinner-border spinner-border-sm"></span> Loading country data…</section> }
+  @if (summary(); as data) {
+    <section class="country-kpis" aria-label="Country monitoring statistics">
+      <article><span>MONITORED ACCOUNTS</span><strong>{{ data.accountCount }}</strong><small>{{ data.activeAccountCount }} active</small></article>
+      <article><span>COLLECTED POSTS</span><strong>{{ data.postCount }}</strong><small>{{ data.postsDetectedToday }} detected today (UTC)</small></article>
+      <article><span>FEED HEALTH</span><strong>{{ data.staleFeedAccountCount }} stale</strong><small>{{ data.failedPollAccountCount }} last poll failures · {{ data.unknownFeedAccountCount }} unknown</small></article>
+    </section>
+    <div class="country-columns">
+      <section class="country-panel source-panel"><header><div><span class="eyebrow">SOURCE GROUP</span><h3>Monitored accounts</h3></div><span class="panel-count">{{ accounts().length }}</span></header>
+        @if (accounts().length) { <ul class="source-list">@for (account of accounts(); track account._id) { <li><span class="source-avatar">@</span><span class="source-copy"><strong>{{ account.displayName || '@' + account.username }}</strong><small>@{{ account.username }} · {{ account.monitoringStatus }}</small></span><span class="source-enabled" [class.disabled]="!account.enabled">{{ account.enabled ? 'Enabled' : 'Disabled' }}</span></li> }</ul> }
+        @else { <p class="empty-note">No accounts are assigned here.</p> }
+      </section>
+      <section class="country-panel feed-panel"><header><div><span class="eyebrow">LATEST COVERAGE</span><h3>Country feed</h3></div><span class="panel-count">{{ totalPosts() }} posts</span></header>
+        <form class="country-filters" [formGroup]="filters" (ngSubmit)="applyFilters()"><input formControlName="search" type="search" aria-label="Search post text, username, or display name" placeholder="Search posts and sources" (input)="onSearchInput($event)">@if (filters.controls.search.value) { <button type="button" class="clear-button" (click)="clearSearch()">Clear search</button> }<select formControlName="category" aria-label="Filter by topic"><option value="">All topics</option><option>World News</option><option>Politics</option><option>Military &amp; Security</option><option>Economy &amp; Finance</option><option>Technology</option><option>Business</option><option>Emergencies</option><option>Other</option></select><select formControlName="notificationStatus" aria-label="Filter by notification status"><option value="">All delivery states</option><option value="pending">Pending</option><option value="sending">Sending</option><option value="sent">Sent</option><option value="failed">Failed</option><option value="skipped">Skipped</option></select><button type="submit">Filter</button><button type="button" class="clear-button" (click)="clearFilters()">Clear all</button></form>
+        @if (loading()) { <div class="feed-empty">Loading posts…</div> }
+        @else if (errorMessage()) { <div class="feed-empty" role="alert">{{ errorMessage() }} <button type="button" (click)="loadCountryPosts()">Retry</button></div> }
+        @else if (posts().length) { <div class="country-post-list">@for (post of posts(); track post._id) { <article class="country-post"><div class="post-byline"><strong>@{{ post.username || 'unknown' }}</strong><span>{{ post.publishedAt ? (post.publishedAt | date:'MMM d, y · HH:mm') : 'Date unavailable' }}</span></div><p>{{ post.text || 'Post text unavailable.' }}</p><footer><span class="topic-pill">{{ post.category || 'Other' }}</span><span class="delivery-pill" [class.sent]="post.notificationStatus === 'sent'">{{ post.notificationStatus }}</span>@if (originalPostUrl(post); as url) { <a [href]="url" target="_blank" rel="noopener noreferrer">Original post <i class="bi bi-arrow-up-right"></i></a> }</footer></article> }</div><nav class="country-pagination" aria-label="Country feed pages"><span>Page {{ page() }} of {{ totalPages() }}</span><div><button type="button" [disabled]="page() <= 1 || loading()" (click)="changePage(page() - 1)">Previous</button><button type="button" [disabled]="page() >= totalPages() || loading()" (click)="changePage(page() + 1)">Next</button></div></nav> }
+        @else { <div class="feed-empty">No posts match this country and the selected filters.</div> }
+      </section>
+    </div>
+  }
+</main>

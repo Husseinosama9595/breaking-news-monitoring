@@ -13,6 +13,7 @@ export interface NotificationHistoryQuery {
   page?: number;
   limit?: number;
   since?: string;
+  country?: string;
 }
 
 @Injectable({ providedIn: 'root' })

@@ -5,7 +5,9 @@
   </header>
 
   <form class="filter-bar" [formGroup]="filters" (ngSubmit)="applyFilters()">
-    <label class="filter-search"><i class="bi bi-search"></i><input formControlName="username" type="search" placeholder="Filter by username" aria-label="Filter by username"></label>
+    <label class="filter-search"><i class="bi bi-search"></i><input formControlName="search" type="search" placeholder="Search post text or account" aria-label="Search post text, username, or display name" (input)="onSearchInput($event)"></label>
+    <button class="clear-filters" type="button" [disabled]="!filters.controls.search.value" (click)="clearSearch()">Clear search</button>
+    <label class="select-wrap"><span>Country</span><select formControlName="country" aria-label="Filter by country"><option value="">All countries</option>@for (country of countries(); track country.countryCode) { <option [value]="country.countryCode">{{ countryFlag(country.countryCode) }} {{ country.countryName }}</option> }<option value="unassigned">Unassigned</option></select></label>
     <label class="select-wrap"><span>Category</span><select formControlName="category" aria-label="Filter by category"><option value="">All categories</option>@for (category of categories; track category) { <option [value]="category">{{ category }}</option> }</select></label>
     <label class="select-wrap"><span>Delivery</span><select formControlName="notificationStatus" aria-label="Filter by notification status"><option value="">All statuses</option>@for (status of statuses; track status) { <option [value]="status">{{ status | titlecase }}</option> }</select></label>
     <button class="filter-submit" type="submit" [disabled]="loading()">Apply filters</button><button class="clear-filters" type="button" [disabled]="loading()" (click)="clearFilters()">Clear</button>
@@ -37,6 +39,7 @@
             }
             <div class="post-footer">
               <div class="post-tags">
+                @if (post.countryCode && post.countryName) { <span class="category country-chip">{{ countryFlag(post.countryCode) }} {{ post.countryName }}</span> } @else { <span class="category country-chip">🌐 Unassigned</span> }
                 @if (post.category) { <span class="category">{{ post.category }}</span> }
                 @if (post.providerName) { <span class="provider">{{ post.providerName }}</span> }
                 <span class="process-state">Processing {{ post.processingStatus }}</span>

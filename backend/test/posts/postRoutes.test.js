@@ -5,6 +5,11 @@ import { createPostController } from '../../src/controllers/postController.js';
 import { createPostRouter } from '../../src/routes/postRoutes.js';
 
 const records = [];
+const monitoredAccounts = [
+  { _id: 'account-ir', platform: 'x', countryCode: 'IR' },
+  { _id: 'account-us', platform: 'x', countryCode: 'US' },
+  { _id: 'account-none', platform: 'x', countryCode: null },
+];
 let databaseFailure = false;
 const token = createAdminToken();
 
@@ -33,9 +38,13 @@ function post(id, fields = {}) {
 
 function matches(record, filter) {
   return Object.entries(filter).every(([field, expected]) => {
+    if (field === '$and') return expected.every((clause) => matches(record, clause));
+    if (field === '$or') return expected.some((clause) => matches(record, clause));
     const actual = record[field];
+    if (field === 'monitoredAccount' && expected?.$in) return expected.$in.includes(actual);
     if (expected && typeof expected === 'object' && expected.$regex) {
-      return new RegExp(expected.$regex, expected.$options).test(String(actual ?? ''));
+      const value = field.includes('.') ? field.split('.').reduce((item, key) => item?.[key], record) : actual;
+      return new RegExp(expected.$regex, expected.$options).test(String(value ?? ''));
     }
     return actual === expected;
   });
@@ -49,6 +58,7 @@ const postModel = {
       offset: 0,
       pageSize: 20,
       select(fields) { this.selectedFields = fields; return this; },
+      populate() { this.populateAccount = true; return this; },
       sort(order) { this.sortOrder = order; return this; },
       skip(value) { this.offset = value; return this; },
       limit(value) { this.pageSize = value; return this; },
@@ -64,7 +74,10 @@ const postModel = {
             }
             return 0;
           })
-          .slice(this.offset, this.offset + this.pageSize);
+          .slice(this.offset, this.offset + this.pageSize)
+          .map((record) => this.populateAccount
+            ? ({ ...record, monitoredAccount: monitoredAccounts.find((account) => account._id === record.monitoredAccount) ?? null })
+            : record);
       },
     };
   },
@@ -74,8 +87,21 @@ const postModel = {
   },
 };
 
-const controller = createPostController({ postModel });
-const router = createPostRouter({ postModel });
+const accountModel = {
+  find(filter) {
+    return {
+      select() { return this; },
+      async lean() {
+        if (filter.countryCode) return monitoredAccounts.filter((account) => account.countryCode === filter.countryCode);
+        if (filter.$or) return monitoredAccounts.filter((account) => account.countryCode == null);
+        return monitoredAccounts;
+      },
+    };
+  },
+};
+
+const controller = createPostController({ postModel, accountModel });
+const router = createPostRouter({ postModel, accountModel });
 
 beforeEach(() => {
   records.length = 0;
@@ -126,6 +152,7 @@ test('returns authenticated posts newest-first with safe fields and default pagi
     text: 'Post newer', publishedAt: new Date('2026-11-10T11:00:00.000Z'),
     postUrl: 'https://x.com/Reuters/status/newer', category: 'World News', providerName: 'nitter',
     priority: 'HIGH', processingStatus: 'processed', notificationStatus: 'sent', telegramSent: true,
+    monitoredAccountId: null, countryCode: null, countryName: null,
     createdAt: new Date('2026-11-10T12:00:00.000Z'),
   });
   assert.equal('raw' in response.body.posts[0], false);
@@ -138,6 +165,29 @@ test('returns an empty result with zero total pages', async () => {
     status: 200,
     body: { posts: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } },
   });
+});
+
+test('country filter scopes posts through the current monitored-account relationship', async () => {
+  records.push(
+    post('iran-post', { monitoredAccount: 'account-ir' }),
+    post('us-post', { monitoredAccount: 'account-us' }),
+    post('unassigned-post', { monitoredAccount: 'account-none' }),
+  );
+  const iran = await invoke({ country: 'IR' });
+  assert.equal(iran.status, 200);
+  assert.deepEqual(iran.body.posts.map((item) => item._id), ['iran-post']);
+  assert.equal(iran.body.posts[0].countryCode, 'IR');
+  assert.equal(iran.body.posts[0].countryName, 'Iran');
+  assert.equal('monitoredAccount' in iran.body.posts[0], false);
+
+  const unassigned = await invoke({ country: 'unassigned' });
+  assert.deepEqual(unassigned.body.posts.map((item) => item._id), ['unassigned-post']);
+  assert.equal(unassigned.body.posts[0].countryCode, null);
+});
+
+test('rejects invalid or repeated country filters', async () => {
+  assert.equal((await invoke({ country: 'ZZ' })).status, 400);
+  assert.equal((await invoke({ country: ['IR', 'US'] })).status, 400);
 });
 
 test('applies page and limit pagination after newest-first sorting', async () => {
@@ -160,6 +210,40 @@ test('supports exact case-insensitive username, category, and notification statu
   assert.deepEqual((await invoke({ username: '@reuters' })).body.posts.map((item) => item._id), ['reuters']);
   assert.deepEqual((await invoke({ category: 'Technology' })).body.posts.map((item) => item._id), ['other']);
   assert.deepEqual((await invoke({ notificationStatus: 'pending' })).body.posts.map((item) => item._id), ['other']);
+});
+
+test('search matches post text and author identity case-insensitively, partially, and with optional @', async () => {
+  records.push(
+    post('content-match', { username: 'sourceA', author: { username: 'sourceA', displayName: 'Desk A' }, text: 'Major Trump development in Iran' }),
+    post('username-match', { username: 'CNNWorld', author: { username: 'CNNWorld', displayName: 'Cable News' }, text: 'A separate update' }),
+    post('display-match', { username: 'sourceC', author: { username: 'sourceC', displayName: 'Donald Trump Reporter' }, text: 'Another update' }),
+    post('elon-match', { username: 'elonmusk', author: { username: 'elonmusk', displayName: 'Elon Musk' }, text: 'A reusable test fixture includes a rocket update' }),
+  );
+  assert.deepEqual((await invoke({ search: '  TRUM  ' })).body.posts.map((item) => item._id).sort(), ['content-match', 'display-match']);
+  assert.deepEqual((await invoke({ search: '@cnn' })).body.posts.map((item) => item._id), ['username-match']);
+  assert.deepEqual((await invoke({ search: 'separate' })).body.posts.map((item) => item._id), ['username-match']);
+  for (const search of ['elon', 'ELON', '@elon', '@elonmusk', '  rocket up  ']) {
+    assert.deepEqual((await invoke({ search })).body.posts.map((item) => item._id), ['elon-match'], `search=${search}`);
+  }
+  assert.deepEqual((await invoke({ username: 'elon' })).body.posts, [], 'username remains the exact-match API filter');
+  assert.deepEqual((await invoke({ username: '@elonmusk' })).body.posts.map((item) => item._id), ['elon-match']);
+  assert.equal((await invoke({ search: '.*' })).body.pagination.total, 0, 'regex metacharacters are treated literally');
+});
+
+test('combines post search with country, account, category filters and filtered pagination counts', async () => {
+  records.push(
+    post('iran-trump-a', { monitoredAccount: 'account-ir', username: 'Reuters', text: 'Trump update A' }),
+    post('iran-trump-b', { monitoredAccount: 'account-ir', username: 'Reuters', text: 'Trump update B' }),
+    post('iran-other', { monitoredAccount: 'account-ir', username: 'Reuters', text: 'Economic update' }),
+    post('us-trump', { monitoredAccount: 'account-us', username: 'Reuters', text: 'Trump update US' }),
+  );
+  const first = await invoke({ country: 'IR', search: 'trump', username: '@reuters', category: 'World News', page: '1', limit: '1' });
+  assert.deepEqual(first.body.pagination, { page: 1, limit: 1, total: 2, totalPages: 2 });
+  assert.equal(first.body.posts.length, 1);
+  const second = await invoke({ country: 'IR', search: 'TRUMP', username: 'Reuters', category: 'World News', page: '2', limit: '1' });
+  assert.deepEqual(second.body.pagination, { page: 2, limit: 1, total: 2, totalPages: 2 });
+  assert.equal(second.body.posts.length, 1);
+  assert.equal((await invoke({ country: 'unassigned', search: 'trump' })).body.pagination.total, 0);
 });
 
 test('rejects malformed, out-of-range, repeated, and unsupported query parameters', async () => {

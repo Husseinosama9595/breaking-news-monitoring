@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, HostListener, inject, signal } from '@angular/core';
 import { LiveNotificationsService } from '../../../core/services/live-notifications.service';
 import { LivePostNotification, NotificationSound } from '../../../core/models/live-notification.model';
+import { countryFlag } from '../../../core/utils/country-flag';
 
 @Component({
   standalone: true,
@@ -14,6 +15,7 @@ export class NotificationCenterComponent {
   protected readonly liveNotifications = inject(LiveNotificationsService);
   protected readonly panelOpen = signal(false);
   protected readonly previewMessage = signal('');
+  protected readonly countryFlag = countryFlag;
 
   protected togglePanel(): void {
     this.liveNotifications.refreshDesktopPermission();

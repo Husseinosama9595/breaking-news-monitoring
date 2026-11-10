@@ -28,6 +28,7 @@
               <div class="notification-copy">
                 <strong>@{{ notification.username }}</strong>
                 @if (notification.category) { <span class="notification-category">{{ notification.category }}</span> }
+                @if (notification.countryName) { <span class="notification-category">{{ countryFlag(notification.countryCode) }} {{ notification.countryName }}</span> }
                 <p>{{ notification.textPreview }}</p>
                 <time [attr.datetime]="notification.detectedAt">Detected {{ notification.detectedAt | date:'MMM d, y · HH:mm:ss' }}</time>
                 @if (notification.postUrl) { <a [href]="notification.postUrl" target="_blank" rel="noopener noreferrer" (click)="handleNotificationOpen(notification)">View original post <i class="bi bi-arrow-up-right"></i></a> }

@@ -2,8 +2,8 @@
   <header class="page-intro">
     <div>
       <div class="eyebrow"><span class="eyebrow-rule"></span> EDITORIAL MONITORING DESK</div>
-      <h2>Good morning, administrator.</h2>
-      <p class="intro-copy">A clear view of the sources and coverage your workspace has collected.</p>
+      <h2>All countries</h2>
+      <p class="intro-copy">A country-organized view of monitored sources and collected coverage.</p>
     </div>
     <button class="dashboard-refresh" type="button" [disabled]="accountsLoading() || postsLoading()" (click)="refreshDashboard()">
       @if (accountsLoading() || postsLoading()) { <span class="refresh-spinner" aria-hidden="true"></span> }
@@ -25,11 +25,25 @@
     </div>
   </section>
 
+  <section class="country-overview-panel content-panel" aria-label="Monitored countries">
+    <div class="panel-heading"><div><div class="panel-kicker">COUNTRY COVERAGE</div><h3>Monitoring by country</h3></div><span class="country-total">{{ countryOverview()?.totals?.countryCount ?? '—' }} countries</span></div>
+    @if (countriesLoading()) { <div class="country-overview-state" role="status"><span class="loading-mark"></span> Loading country summaries…</div> }
+    @else if (countriesError()) { <div class="country-overview-state error-state" role="alert">{{ countriesError() }} <button type="button" (click)="loadCountries()">Retry</button></div> }
+    @else if (countryOverview()?.countries?.length) {
+      <div class="country-card-grid">
+        @for (country of countryOverview()!.countries; track country.countryCode) {
+          <a class="country-card" [routerLink]="['/countries', country.countryCode]"><span class="country-card-flag">{{ countryFlag(country.countryCode) }}</span><span class="country-card-name">{{ country.countryName || country.countryCode }}</span><span class="country-card-stats">{{ country.accountCount }} sources <i></i> {{ country.postCount }} posts</span><span class="country-card-health">{{ country.staleFeedAccountCount }} stale · {{ country.failedPollAccountCount }} poll failures</span><span class="country-card-latest">@if (hasValidTimestamp(country.latestPublishedAt)) { Latest {{ country.latestPublishedAt | date:'MMM d · HH:mm' }} } @else { No published timestamp }</span></a>
+        }
+      </div>
+      @if ((countryOverview()?.unassigned?.accountCount ?? 0) > 0) { <a class="unassigned-note" [routerLink]="['/countries', 'unassigned']">{{ countryOverview()?.unassigned?.accountCount }} accounts are unassigned <i class="bi bi-arrow-right"></i></a> }
+    } @else { <div class="country-overview-state"><i class="bi bi-globe2"></i> No country assignments yet. Assign countries from Accounts to organize coverage.</div> }
+  </section>
+
   <section class="kpi-grid" aria-label="Monitoring statistics">
-    <article class="kpi-item"><div class="kpi-heading"><span>MONITORED ACCOUNTS</span><i class="bi bi-broadcast"></i></div><div class="kpi-number">{{ accountsLoaded() ? totalAccounts() : '—' }}</div><div class="kpi-caption">{{ accountsLoaded() ? 'Accounts in the current roster' : accountsError() ? 'Account data unavailable' : 'Loading account data' }}</div></article>
-    <article class="kpi-item"><div class="kpi-heading"><span>ACTIVE SOURCES</span><i class="bi bi-activity"></i></div><div class="kpi-number">{{ accountsLoaded() ? activeAccounts() : '—' }}</div><div class="kpi-caption">{{ accountsLoaded() ? 'Enabled with active monitoring status' : accountsError() ? 'Account data unavailable' : 'Loading account data' }}</div></article>
-    <article class="kpi-item"><div class="kpi-heading"><span>DISABLED</span><i class="bi bi-pause-circle"></i></div><div class="kpi-number">{{ accountsLoaded() ? disabledAccounts() : '—' }}</div><div class="kpi-caption">{{ accountsLoaded() ? 'Accounts currently disabled' : accountsError() ? 'Account data unavailable' : 'Loading account data' }}</div></article>
-    <article class="kpi-item kpi-alerts"><div class="kpi-heading"><span>COLLECTED POSTS</span><i class="bi bi-newspaper"></i></div><div class="kpi-number">{{ postsLoaded() ? totalPosts() : '—' }}</div><div class="kpi-caption">{{ postsLoaded() ? 'Total matching stored posts' : postsError() ? 'Post data unavailable' : 'Loading post data' }}</div></article>
+    <article class="kpi-item"><div class="kpi-heading"><span>MONITORED COUNTRIES</span><i class="bi bi-globe2"></i></div><div class="kpi-number">{{ countryOverview()?.totals?.countryCount ?? '—' }}</div><div class="kpi-caption">{{ countriesError() ? countriesError() : 'Countries with assigned sources' }}</div></article>
+    <article class="kpi-item"><div class="kpi-heading"><span>MONITORED ACCOUNTS</span><i class="bi bi-broadcast"></i></div><div class="kpi-number">{{ accountsLoaded() ? totalAccounts() : '—' }}</div><div class="kpi-caption">{{ accountsLoaded() ? activeAccounts() + ' active · ' + disabledAccounts() + ' disabled' : accountsError() ? 'Account data unavailable' : 'Loading account data' }}</div></article>
+    <article class="kpi-item"><div class="kpi-heading"><span>POSTS DETECTED TODAY</span><i class="bi bi-calendar-event"></i></div><div class="kpi-number">{{ countryOverview()?.totals?.postsDetectedToday ?? '—' }}</div><div class="kpi-caption">{{ countryOverview() ? ('Since ' + (countryOverview()!.dayStartsAt | date:'HH:mm') + ' UTC') : 'UTC day boundary from backend' }}</div></article>
+    <article class="kpi-item kpi-alerts"><div class="kpi-heading"><span>TOTAL DETECTED POSTS</span><i class="bi bi-newspaper"></i></div><div class="kpi-number">{{ postsLoaded() ? totalPosts() : '—' }}</div><div class="kpi-caption">{{ postsLoaded() ? 'Total matching stored posts' : postsError() ? 'Post data unavailable' : 'Loading post data' }}</div></article>
   </section>
 
   <div class="dashboard-grid">
@@ -48,7 +62,7 @@
             <div class="entry-body">
             <div class="entry-meta"><div class="source-avatar">{{ (post.author?.displayName || post.username || '?').slice(0, 1).toUpperCase() }}</div><div class="source-copy"><strong>{{ post.author?.displayName || (post.username ? '@' + post.username : 'Unknown account') }}</strong><small>{{ post.username ? '@' + post.username : 'Username unavailable' }} <span>·</span> {{ hasValidPostTimestamp(post.publishedAt) ? (post.publishedAt | date:'MMM d, y · HH:mm') : 'Date unavailable' }}</small></div><span class="priority-tag" [class.high]="post.priority === 'HIGH'" [class.normal]="post.priority === 'NORMAL'"><i></i>{{ post.priority }}</span></div>
               <p class="entry-text">{{ post.text || 'Post text unavailable.' }}</p>
-              <div class="entry-footer"><div class="entry-tags"><span class="category-tag">{{ post.category }}</span><span class="provider-tag">{{ post.providerName }}</span></div><span class="delivery-status" [class.sent]="post.notificationStatus === 'sent'" [class.failed]="post.notificationStatus === 'failed'"><i class="bi" [class.bi-check-circle-fill]="post.notificationStatus === 'sent'" [class.bi-clock]="post.notificationStatus !== 'sent' && post.notificationStatus !== 'failed'" [class.bi-exclamation-circle]="post.notificationStatus === 'failed'"></i>{{ post.notificationStatus }}</span></div>
+              <div class="entry-footer"><div class="entry-tags">@if (post.countryCode && post.countryName) { <span class="category-tag">{{ countryFlag(post.countryCode) }} {{ post.countryName }}</span> }<span class="category-tag">{{ post.category }}</span><span class="provider-tag">{{ post.providerName }}</span></div><span class="delivery-status" [class.sent]="post.notificationStatus === 'sent'" [class.failed]="post.notificationStatus === 'failed'"><i class="bi" [class.bi-check-circle-fill]="post.notificationStatus === 'sent'" [class.bi-clock]="post.notificationStatus !== 'sent' && post.notificationStatus !== 'failed'" [class.bi-exclamation-circle]="post.notificationStatus === 'failed'"></i>{{ post.notificationStatus }}</span></div>
             </div>
           </article>
         }

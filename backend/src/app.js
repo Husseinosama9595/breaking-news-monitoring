@@ -9,6 +9,7 @@ import accountRoutes from './routes/accountRoutes.js';
 import postRoutes from './routes/postRoutes.js';
 import eventRoutes from './routes/eventRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import countryRoutes from './routes/countryRoutes.js';
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use(rateLimit({
 app.use('/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/accounts', accountRoutes);
+app.use('/api/countries', countryRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/events', eventRoutes);

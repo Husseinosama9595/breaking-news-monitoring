@@ -1,0 +1,10 @@
+:host { display:contents; }
+.app-toast-viewport { position:fixed; z-index:var(--app-z-toast); top:78px; right:22px; display:grid; width:min(390px,calc(100vw - 28px)); gap:9px; pointer-events:none; }
+.app-toast { display:flex; align-items:flex-start; gap:11px; padding:13px 12px; border:1px solid var(--app-border); border-radius:15px; background:var(--app-surface); box-shadow:var(--app-shadow-popover); pointer-events:auto; animation:toast-enter 190ms cubic-bezier(.2,.75,.2,1) both; transition:opacity 160ms ease,transform 160ms ease; }.app-toast.leaving { opacity:0; transform:translate3d(12px,0,0) scale(.98); }
+.toast-icon { display:grid; width:30px; height:30px; flex:0 0 30px; place-items:center; border-radius:10px; background:var(--app-accent-soft); color:var(--app-accent); }
+.toast-success .toast-icon { background:var(--app-green-soft); color:var(--app-green); }.toast-error .toast-icon { background:var(--app-critical-soft); color:var(--app-critical); }.toast-warning .toast-icon { background:var(--app-amber-soft); color:var(--app-amber); }
+.toast-message { flex:1; min-width:0; padding-top:2px; }.toast-message strong { display:block; color:var(--app-ink); font-size:11px; font-weight:800; }.toast-message p { margin:4px 0 0; color:var(--app-muted); font-size:10px; line-height:1.5; overflow-wrap:anywhere; }
+.toast-action,.toast-close { flex:0 0 auto; border:0; border-radius:8px; background:transparent; color:var(--app-muted); cursor:pointer; }.toast-action { padding:6px 8px; color:var(--app-accent-dark); font-size:10px; font-weight:750; }.toast-close { display:grid; width:27px; height:27px; place-items:center; }.toast-action:hover,.toast-close:hover { background:var(--app-background-tint); color:var(--app-ink); }.spinning-icon { animation:toast-spin 1s linear infinite; }
+@keyframes toast-enter { from { opacity:0; transform:translate3d(16px,-4px,0) scale(.98); } to { opacity:1; transform:translate3d(0,0,0) scale(1); } } @keyframes toast-spin { to { transform:rotate(360deg); } }
+@media (max-width:650px) { .app-toast-viewport { top:74px; right:12px; } }
+@media (prefers-reduced-motion:reduce) { .app-toast,.spinning-icon { animation:none; } }

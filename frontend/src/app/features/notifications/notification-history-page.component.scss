@@ -33,3 +33,5 @@
 @keyframes spin { to { transform:rotate(360deg); } }
 @media (max-width:600px) { .page-heading { align-items:flex-start; flex-direction:column; gap:13px; }.mark-all-button { align-self:flex-end; }.notification-list { padding-inline:13px; }.notification-item { grid-template-columns:23px minmax(0,1fr); gap:8px; }.timeline-marker { width:23px; height:23px; }.history-toolbar { padding-inline:14px; }.notification-topline { align-items:flex-start; }.read-state { padding-top:2px; } }
 @media (prefers-reduced-motion:reduce) { .spinner { animation:none; } }
+.history-heading-actions { display:flex; align-items:center; gap:9px; }.country-history-filter { display:flex; align-items:center; gap:8px; color:var(--app-muted); font-size:11px; font-weight:700; }.country-history-filter select { min-height:39px; max-width:210px; padding:7px 10px; border:1px solid var(--app-border); border-radius:10px; background:var(--app-surface); color:var(--app-ink); }
+@media(max-width:650px) { .history-heading-actions { width:100%; flex-wrap:wrap; }.country-history-filter { flex:1; }.country-history-filter select { min-width:0; flex:1; }.mark-all-button { flex:1; } }

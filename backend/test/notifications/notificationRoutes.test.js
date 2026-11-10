@@ -5,6 +5,11 @@ import { createNotificationController } from '../../src/controllers/notification
 import { createNotificationRouter } from '../../src/routes/notificationRoutes.js';
 
 const records = [];
+const monitoredAccounts = [
+  { _id: 'account-ir', platform: 'x', countryCode: 'IR' },
+  { _id: 'account-us', platform: 'x', countryCode: 'US' },
+  { _id: 'account-none', platform: 'x', countryCode: null },
+];
 let failQueries = false;
 const token = createAdminToken();
 
@@ -17,6 +22,7 @@ function matches(record, filter) {
     const actual = getPath(record, path);
     if (expected === null) return actual == null;
     if (expected && typeof expected === 'object') {
+      if ('$in' in expected) return expected.$in.includes(actual?._id ?? actual);
       if ('$exists' in expected && (actual !== undefined) !== expected.$exists) return false;
       if ('$gte' in expected && !(actual instanceof Date ? actual : new Date(actual))
         || ('$gte' in expected && (actual == null || new Date(actual) < expected.$gte))) return false;
@@ -28,12 +34,20 @@ function matches(record, filter) {
 
 function query(operation) {
   return {
-    sortOrder: {}, offset: 0, pageSize: 20,
+    sortOrder: {}, offset: 0, pageSize: 20, populated: false,
     select() { return this; },
+    populate() { this.populated = true; return this; },
     sort(value) { this.sortOrder = value; return this; },
     skip(value) { this.offset = value; return this; },
     limit(value) { this.pageSize = value; return this; },
-    async lean() { if (failQueries) throw new Error('database unavailable'); return operation(this); },
+    async lean() {
+      if (failQueries) throw new Error('database unavailable');
+      const result = await operation(this);
+      const attachAccount = (record) => this.populated && record
+        ? { ...record, monitoredAccount: monitoredAccounts.find((account) => account._id === record.monitoredAccount) ?? null }
+        : record;
+      return Array.isArray(result) ? result.map(attachAccount) : attachAccount(result);
+    },
   };
 }
 
@@ -69,9 +83,19 @@ const model = {
   },
 };
 
+const accountModel = {
+  find(filter) {
+    return query(() => monitoredAccounts.filter((account) => {
+      if (filter.$or) return account.countryCode == null;
+      return !filter.countryCode || account.countryCode === filter.countryCode;
+    }));
+  },
+};
+
 function post(id, createdAt, readAt = null, fields = {}) {
   return {
     _id: id,
+    monitoredAccount: 'account-ir',
     username: 'SignalDesk',
     author: { username: 'SignalDesk', displayName: 'Signal Desk' },
     text: `Post ${id}`,
@@ -83,10 +107,10 @@ function post(id, createdAt, readAt = null, fields = {}) {
   };
 }
 
-const controller = createNotificationController({ postModel: model, clock: () => new Date('2026-11-10T13:00:00.000Z') });
-const router = createNotificationRouter({ postModel: model });
+const controller = createNotificationController({ postModel: model, accountModel, clock: () => new Date('2026-11-10T13:00:00.000Z') });
+const router = createNotificationRouter({ postModel: model, accountModel });
 
-beforeEach(() => { records.length = 0; failQueries = false; });
+beforeEach(() => { records.length = 0; failQueries = false; monitoredAccounts[0].countryCode = 'IR'; });
 
 function response() {
   return { statusCode: 200, payload: null, status(code) { this.statusCode = code; return this; }, json(body) { this.payload = body; return this; } };
@@ -157,6 +181,21 @@ test('returns unread count and handles no notification records', async () => {
   assert.deepEqual((await invoke(controller.unreadCount)).body, { unreadCount: 0 });
   records.length = 0;
   assert.deepEqual((await invoke(controller.list)).body.notifications, []);
+});
+
+test('notification country is resolved through the account and reflects reassignment without duplicating records', async () => {
+  records.push(post('000000000000000000000008', '2026-11-10T12:00:00.000Z'));
+  const initial = await invoke(controller.list);
+  assert.equal(initial.body.notifications[0].countryCode, 'IR');
+  assert.equal(initial.body.notifications[0].countryName, 'Iran');
+
+  monitoredAccounts[0].countryCode = 'US';
+  const moved = await invoke(controller.list, { query: { country: 'US' } });
+  assert.equal(moved.body.pagination.total, 1);
+  assert.equal(moved.body.notifications[0].notificationId, '000000000000000000000008');
+  assert.equal(moved.body.notifications[0].countryCode, 'US');
+  assert.equal(moved.body.notifications[0].countryName, 'United States');
+  assert.equal(records.length, 1);
 });
 
 test('marks one notification read idempotently and distinguishes missing records and IDs', async () => {

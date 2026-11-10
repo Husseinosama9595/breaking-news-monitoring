@@ -1,6 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, effect, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { AccountsApiService } from '../../core/services/accounts-api.service';
@@ -8,6 +8,10 @@ import { MonitoredAccount } from '../../core/models/monitored-account.model';
 import { accountFeedFreshness, isValidApiTimestamp } from '../../core/utils/account-health';
 import { PostsApiService } from '../../core/services/posts-api.service';
 import { MonitoredPost } from '../../core/models/post.model';
+import { CountriesApiService } from '../../core/services/countries-api.service';
+import { CountryOverviewResponse } from '../../core/models/country.model';
+import { countryFlag } from '../../core/utils/country-flag';
+import { LiveNotificationsService } from '../../core/services/live-notifications.service';
 
 @Component({
   standalone: true,
@@ -19,6 +23,8 @@ import { MonitoredPost } from '../../core/models/post.model';
 export class DashboardPageComponent implements OnInit {
   private readonly accountsApi = inject(AccountsApiService);
   private readonly postsApi = inject(PostsApiService);
+  private readonly countriesApi = inject(CountriesApiService);
+  private readonly liveNotifications = inject(LiveNotificationsService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly accounts = signal<MonitoredAccount[]>([]);
@@ -37,6 +43,18 @@ export class DashboardPageComponent implements OnInit {
   protected readonly postsLoaded = signal(false);
   protected readonly postsError = signal('');
   protected readonly totalPosts = signal<number | null>(null);
+  protected readonly countryOverview = signal<CountryOverviewResponse | null>(null);
+  protected readonly countriesLoading = signal(true);
+  protected readonly countriesError = signal('');
+  protected readonly countryFlag = countryFlag;
+
+  constructor() {
+    effect(() => {
+      if (!this.liveNotifications.lastLiveNotification()) return;
+      this.loadPosts();
+      this.loadCountries();
+    });
+  }
 
   protected hasValidPostTimestamp(value: string | null | undefined): boolean {
     return isValidApiTimestamp(value);
@@ -64,12 +82,22 @@ export class DashboardPageComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.refreshDashboard();
+    this.refreshDashboard(false);
   }
 
-  protected refreshDashboard(): void {
+  protected refreshDashboard(forceCountryRefresh = true): void {
     this.loadAccounts();
     this.loadPosts();
+    this.loadCountries(forceCountryRefresh);
+  }
+
+  protected loadCountries(force = true): void {
+    this.countriesLoading.set(true);
+    this.countriesError.set('');
+    (force ? this.countriesApi.refreshOverview() : this.countriesApi.getOverview()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (overview) => { this.countryOverview.set(overview); this.countriesLoading.set(false); },
+      error: () => { this.countriesError.set('Could not load country summaries.'); this.countriesLoading.set(false); },
+    });
   }
 
   protected loadAccounts(): void {

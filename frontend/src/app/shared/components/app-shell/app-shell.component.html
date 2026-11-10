@@ -1,25 +1,39 @@
 <div class="console-layout">
   <button class="mobile-scrim" [class.visible]="sidebarOpen()" type="button" aria-label="Close navigation" (click)="closeSidebar()"></button>
-  <aside class="sidebar" [class.open]="sidebarOpen()" aria-label="Application sidebar">
-    <a class="brand" routerLink="/dashboard" (click)="closeSidebar()" aria-label="Breaking News Monitor overview"><span class="brand-mark"><i class="bi bi-broadcast-pin"></i></span><span class="brand-copy"><strong>THE SIGNAL DESK</strong><small>BREAKING NEWS MONITOR</small></span></a>
-    <div class="nav-label">MONITOR</div>
-    <nav class="side-nav" aria-label="Main navigation">
-      <a routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeSidebar()"><i class="bi bi-grid-1x2"></i><span>Overview</span><span class="active-mark"></span></a>
-      <a routerLink="/accounts" routerLinkActive="active" (click)="closeSidebar()"><i class="bi bi-broadcast"></i><span>Monitored accounts</span><span class="active-mark"></span></a>
-      <a routerLink="/posts" routerLinkActive="active" (click)="closeSidebar()"><i class="bi bi-lightning-charge"></i><span>Collected posts</span><span class="active-mark"></span></a>
+  <aside class="sidebar" [class.open]="sidebarOpen()" [class.collapsed]="sidebarCollapsed()" aria-label="Application sidebar">
+    <a class="brand" routerLink="/dashboard" (click)="closeSidebar()" aria-label="Breaking News Monitor overview" title="Signal Desk"><span class="brand-mark"><i class="bi bi-broadcast-pin"></i></span><span class="brand-copy"><strong>THE SIGNAL DESK</strong><small>INTELLIGENCE MONITOR</small></span></a>
+    <button class="collapse-toggle" type="button" (click)="toggleCollapsed()" [attr.aria-label]="sidebarCollapsed() ? 'Expand sidebar' : 'Collapse sidebar'" [attr.aria-expanded]="!sidebarCollapsed()"><i class="bi" [class.bi-layout-sidebar-inset-reverse]="!sidebarCollapsed()" [class.bi-layout-sidebar-inset]="sidebarCollapsed()"></i><span>{{ sidebarCollapsed() ? 'Expand menu' : 'Collapse menu' }}</span></button>
+    <div class="nav-label">OVERVIEW</div>
+    <nav class="side-nav" aria-label="Overview navigation">
+      <a routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeSidebar()" title="All countries"><i class="bi bi-globe2"></i><span>All countries</span><span class="active-mark"></span></a>
     </nav>
-    <div class="nav-label nav-label-spaced">WORKSPACE</div>
+    <div class="nav-label nav-label-spaced">MONITORING</div>
+    <nav class="side-nav" aria-label="Monitoring navigation">
+      <button class="country-nav-toggle" type="button" (click)="toggleCountryNavigation()" [attr.aria-expanded]="countriesExpanded()"><i class="bi bi-flag"></i><span>Country feeds</span><i class="bi" [class.bi-chevron-down]="countriesExpanded()" [class.bi-chevron-right]="!countriesExpanded()"></i></button>
+      @if (countriesExpanded()) {
+        @for (country of visibleCountries(); track country.countryCode) {
+          <a class="country-nav-link" [routerLink]="['/countries', country.countryCode]" routerLinkActive="active" (click)="closeSidebar()" [title]="country.countryName"><span class="country-nav-flag">{{ countryFlag(country.countryCode) }}</span><span>{{ country.countryName }}</span><small>{{ country.accountCount }}</small></a>
+        }
+        @if (countries().length > 8) { <button class="country-nav-more" type="button" (click)="toggleAllCountries()">{{ allCountriesExpanded() ? 'Show fewer' : 'Show all ' + countries().length }}</button> }
+        @if ((unassignedCountry()?.accountCount ?? 0) > 0) { <a class="country-nav-link" [routerLink]="['/countries', 'unassigned']" routerLinkActive="active" (click)="closeSidebar()" title="Unassigned sources"><span class="country-nav-flag">🌐</span><span>Unassigned</span><small>{{ unassignedCountry()?.accountCount }}</small></a> }
+        @if (countries().length === 0 && (unassignedCountry()?.accountCount ?? 0) === 0) { <span class="country-nav-empty">No country assignments</span> }
+      }
+      <a routerLink="/accounts" routerLinkActive="active" (click)="closeSidebar()" title="Monitored accounts"><i class="bi bi-broadcast"></i><span>Accounts</span><span class="active-mark"></span></a>
+      <a routerLink="/posts" routerLinkActive="active" (click)="closeSidebar()" title="All collected posts"><i class="bi bi-lightning-charge"></i><span>All posts</span><span class="active-mark"></span></a>
+    </nav>
+    <div class="nav-label nav-label-spaced">ACTIVITY & SETTINGS</div>
     <nav class="side-nav" aria-label="Workspace navigation">
-      <a routerLink="/notifications" routerLinkActive="active" (click)="closeSidebar()"><i class="bi bi-send"></i><span>Notification history</span><span class="active-mark"></span></a>
-      <a routerLink="/settings" routerLinkActive="active" (click)="closeSidebar()"><i class="bi bi-sliders2"></i><span>Settings</span><span class="active-mark"></span></a>
+      <a routerLink="/notifications" routerLinkActive="active" (click)="closeSidebar()" title="Notification history"><i class="bi bi-send"></i><span>Notification history</span><span class="active-mark"></span></a>
+      <a routerLink="/settings" routerLinkActive="active" (click)="closeSidebar()" title="Settings"><i class="bi bi-sliders2"></i><span>Settings</span><span class="active-mark"></span></a>
     </nav>
     <div class="sidebar-spacer"></div>
     <div class="workspace-state"><span class="state-icon"><i class="bi bi-shield-check"></i></span><div><strong>Private workspace</strong><small>Administrator session</small></div></div>
     <div class="admin-area"><div class="admin-avatar">A</div><div class="admin-copy"><strong>Administrator</strong><small>Signed in</small></div><button class="logout-button" type="button" title="Sign out" aria-label="Sign out" (click)="logout()"><i class="bi bi-box-arrow-right"></i></button></div>
   </aside>
   <main class="main-column">
-    <header class="topbar"><div class="heading-group"><button class="menu-toggle" type="button" aria-label="Toggle navigation" (click)="toggleSidebar()"><i class="bi bi-list"></i></button><div class="breadcrumb"><span>{{ pageSection() }}</span><i class="bi bi-chevron-right"></i><strong>{{ pageTitle() }}</strong></div><h1>{{ pageTitle() }}</h1></div><div class="topbar-tools"><div class="connection-status"><span class="status-lamp"></span><span>Admin session active</span></div><app-notification-center /><span class="topbar-brand-mark"><i class="bi bi-broadcast"></i></span></div></header>
+    <header class="topbar"><div class="heading-group"><button class="menu-toggle" type="button" aria-label="Toggle navigation" (click)="toggleSidebar()"><i class="bi bi-list"></i></button><div class="title-stack"><div class="breadcrumb"><span>{{ pageSection() }}</span><i class="bi bi-chevron-right"></i><strong>{{ pageTitle() }}</strong></div><h1>{{ pageTitle() }}</h1></div></div><div class="topbar-tools"><div class="global-search" aria-label="Global search is not available yet"><i class="bi bi-search"></i><span>Search sources and posts</span><kbd>⌘ K</kbd></div><div class="connection-status" [class.connected]="liveNotifications.connectionState() === 'connected'"><span class="status-lamp"></span><span>{{ connectionLabel() }}</span></div><button class="theme-toggle" type="button" (click)="theme.toggle()" [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'" [title]="theme.theme() === 'dark' ? 'Light theme' : 'Dark theme'"><i class="bi" [class.bi-moon-stars]="theme.theme() === 'light'" [class.bi-sun]="theme.theme() === 'dark'"></i></button><app-notification-center /><div class="topbar-profile" aria-label="Administrator profile"><span class="profile-avatar">A</span><span>Admin</span></div></div></header>
     <section class="page-content"><router-outlet /></section>
     <footer class="console-footer"><span>THE SIGNAL DESK</span><span>PRIVATE ADMIN WORKSPACE</span></footer>
+    <app-toast-viewport />
   </main>
 </div>

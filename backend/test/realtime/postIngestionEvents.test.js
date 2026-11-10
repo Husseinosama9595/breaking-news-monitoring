@@ -16,7 +16,7 @@ function makePost({ id, providerName = 'mock', publishedAt = new Date('2026-11-1
   }, providerName);
 }
 
-function makeHarness({ providerName = 'mock', baselineAt = null, upsertedIndexes, bulkError } = {}) {
+function makeHarness({ providerName = 'mock', baselineAt = null, countryCode = null, upsertedIndexes, bulkError } = {}) {
   const events = [];
   const order = [];
   const writtenOperations = [];
@@ -25,6 +25,7 @@ function makeHarness({ providerName = 'mock', baselineAt = null, upsertedIndexes
     username: 'SignalDesk',
     category: 'World News',
     providerName,
+    countryCode,
     notificationBaselineAt: baselineAt,
   };
   const accountModel = {
@@ -86,6 +87,18 @@ test('does not publish duplicate upserts', async () => {
   assert.equal(result.insertedCount, 0);
   assert.equal(result.duplicateCount, 1);
   assert.deepEqual(harness.events, []);
+});
+
+test('includes the source account ID and its current country assignment on the single existing SSE event', async () => {
+  const harness = makeHarness({ countryCode: 'IR' });
+  await harness.ingest({
+    account: { username: 'SignalDesk' },
+    batch: { providerName: 'mock', fetchedAt: receivedAt, posts: [makePost({ id: 'country-context' })] },
+    receivedAt,
+  });
+  assert.equal(harness.events.length, 1);
+  assert.equal(harness.events[0].monitoredAccountId, String(accountId));
+  assert.equal(harness.events[0].countryCode, 'IR');
 });
 
 test('does not publish first-poll Nitter baseline history or posts at/before an existing baseline', async () => {

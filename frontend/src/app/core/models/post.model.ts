@@ -7,6 +7,9 @@ export interface MonitoredPost {
   publishedAt?: string | null;
   postUrl?: string | null;
   category?: string | null;
+  monitoredAccountId?: string | null;
+  countryCode?: string | null;
+  countryName?: string | null;
   providerName?: string | null;
   priority: 'CRITICAL' | 'HIGH' | 'NORMAL';
   processingStatus: 'pending' | 'processing' | 'processed' | 'failed';
@@ -24,6 +27,8 @@ export interface PostsQuery {
   page?: number;
   limit?: number;
   username?: string;
+  search?: string;
   category?: string;
   notificationStatus?: string;
+  country?: string;
 }

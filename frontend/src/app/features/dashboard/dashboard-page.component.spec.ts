@@ -1,14 +1,19 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
+import { of } from 'rxjs';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { authInterceptor } from '../../core/interceptors/auth.interceptor';
 import { DashboardPageComponent } from './dashboard-page.component';
+import { CountriesApiService } from '../../core/services/countries-api.service';
+import { LiveNotificationsService } from '../../core/services/live-notifications.service';
 
 const TOKEN_KEY = 'breaking-news-monitor.access-token';
 const API_URL = 'http://localhost:3000/api/accounts';
 const POSTS_API_URL = 'http://localhost:3000/api/posts?page=1&limit=5';
+const EMPTY_COUNTRY_OVERVIEW = { countries: [], unassigned: { countryCode: null, accountCount: 0, activeAccountCount: 0, failedPollAccountCount: 0, staleFeedAccountCount: 0, unknownFeedAccountCount: 0, postCount: 0, postsDetectedToday: 0, latestPublishedAt: null }, totals: { countryCount: 0, accountCount: 0, activeAccountCount: 0, postCount: 0, postsDetectedToday: 0 }, serverTime: '2026-11-10T12:00:00.000Z', dayStartsAt: '2026-11-10T00:00:00.000Z' };
 
 describe('DashboardPageComponent account roster', () => {
   let fixture: ComponentFixture<DashboardPageComponent>;
@@ -23,6 +28,8 @@ describe('DashboardPageComponent account roster', () => {
         provideHttpClient(withInterceptors([authInterceptor])),
         provideHttpClientTesting(),
         provideRouter([]),
+        { provide: CountriesApiService, useValue: { overview: signal(EMPTY_COUNTRY_OVERVIEW), getOverview: () => of(EMPTY_COUNTRY_OVERVIEW), refreshOverview: () => of(EMPTY_COUNTRY_OVERVIEW) } },
+        { provide: LiveNotificationsService, useValue: { lastLiveNotification: signal(null) } },
       ],
     });
     http = TestBed.inject(HttpTestingController);
@@ -147,10 +154,11 @@ describe('DashboardPageComponent account roster', () => {
     fixture.detectChanges();
 
     const kpis = fixture.nativeElement.querySelectorAll('.kpi-number') as NodeListOf<HTMLElement>;
-    expect(kpis[0].textContent?.trim()).toBe('4');
-    expect(kpis[1].textContent?.trim()).toBe('2');
-    expect(kpis[2].textContent?.trim()).toBe('1');
+    expect(kpis[0].textContent?.trim()).toBe('0');
+    expect(kpis[1].textContent?.trim()).toBe('4');
+    expect(kpis[2].textContent?.trim()).toBe('0');
     expect(kpis[3].textContent?.trim()).toBe('7');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('2 active · 1 disabled');
   });
 
   it('clears account KPIs to unavailable after an account API error', () => {
@@ -162,9 +170,9 @@ describe('DashboardPageComponent account roster', () => {
     fixture.detectChanges();
 
     const kpis = fixture.nativeElement.querySelectorAll('.kpi-number') as NodeListOf<HTMLElement>;
-    expect(kpis[0].textContent?.trim()).toBe('—');
+    expect(kpis[0].textContent?.trim()).toBe('0');
     expect(kpis[1].textContent?.trim()).toBe('—');
-    expect(kpis[2].textContent?.trim()).toBe('—');
+    expect(kpis[2].textContent?.trim()).toBe('0');
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Account service unavailable');
   });
 
@@ -191,7 +199,7 @@ describe('DashboardPageComponent account roster', () => {
     fixture.detectChanges();
 
     const kpis = fixture.nativeElement.querySelectorAll('.kpi-number') as NodeListOf<HTMLElement>;
-    expect(kpis[0].textContent?.trim()).toBe('1');
+    expect(kpis[0].textContent?.trim()).toBe('0');
     expect(kpis[1].textContent?.trim()).toBe('1');
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Unknown');
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Poll failed');

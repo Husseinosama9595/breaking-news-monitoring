@@ -11,6 +11,7 @@ const event = {
   eventId: 'post-1', postId: 'post-1', username: '@Reuters', displayName: 'Reuters',
   textPreview: 'New post content', postUrl: 'https://x.com/Reuters/status/1',
   publishedAt: '2026-11-10T12:00:00.000Z', detectedAt: '2026-11-10T12:00:03.000Z', category: 'World News',
+  monitoredAccountId: 'account-1', countryCode: 'IR',
 };
 
 test('normalizes safe public fields and drops unsafe original URLs', () => {
@@ -21,6 +22,9 @@ test('normalizes safe public fields and drops unsafe original URLs', () => {
   assert.equal(normalizePostCreatedEvent({ ...event, detectedAt: 'not-a-date' }), null);
   assert.equal(normalizePostCreatedEvent({ ...event, postUrl: 'https://attacker.example/path' }).postUrl, null);
   assert.equal(normalized.notificationId, event.eventId);
+  assert.equal(normalized.monitoredAccountId, 'account-1');
+  assert.equal(normalized.countryCode, 'IR');
+  assert.equal(normalized.countryName, 'Iran');
 });
 
 test('broadcasts one event to multiple subscribers and supports idempotent cleanup', async () => {

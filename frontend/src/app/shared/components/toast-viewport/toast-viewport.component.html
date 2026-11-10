@@ -1,0 +1,10 @@
+<section class="app-toast-viewport" aria-label="Application messages" aria-live="polite" aria-relevant="additions" aria-atomic="false">
+  @for (toast of toastService.toasts(); track toast.id) {
+    <article class="app-toast" [class]="'app-toast toast-' + toast.kind" [class.leaving]="toastService.isLeaving(toast.id)" [attr.role]="toast.kind === 'error' ? 'alert' : 'status'">
+      <span class="toast-icon" aria-hidden="true"><i class="bi" [class]="'bi ' + iconFor(toast)" [class.spinning-icon]="toast.kind === 'loading'"></i></span>
+      <div class="toast-message"><strong>{{ toast.title }}</strong>@if (toast.description) { <p>{{ toast.description }}</p> }</div>
+      @if (toast.action) { <button type="button" class="toast-action" (click)="runAction(toast)">{{ toast.action.label }}</button> }
+      <button type="button" class="toast-close" [attr.aria-label]="'Dismiss ' + toast.title" (click)="toastService.dismissAnimated(toast.id)"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+    </article>
+  }
+</section>

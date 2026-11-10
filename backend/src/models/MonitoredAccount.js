@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { isValidCountryCode } from '../data/countryCatalog.js';
 
 export const ACCOUNT_CATEGORIES = Object.freeze([
   'World News', 'Politics', 'Military & Security', 'Economy & Finance',
@@ -10,6 +11,13 @@ const monitoredAccountSchema = new mongoose.Schema({
   username: { type: String, required: true, trim: true },
   normalizedUsername: { type: String, required: true, lowercase: true, trim: true },
   displayName: { type: String, default: null, trim: true },
+  countryCode: {
+    type: String,
+    default: null,
+    uppercase: true,
+    trim: true,
+    validate: { validator: (value) => value == null || isValidCountryCode(value), message: 'countryCode must be a valid ISO 3166-1 alpha-2 code' },
+  },
   category: { type: String, enum: ACCOUNT_CATEGORIES, default: 'Other', required: true },
   enabled: { type: Boolean, default: true, required: true },
   providerName: { type: String, required: true, trim: true },
@@ -38,6 +46,7 @@ const monitoredAccountSchema = new mongoose.Schema({
 }, { timestamps: true, minimize: false });
 
 monitoredAccountSchema.index({ platform: 1, normalizedUsername: 1 }, { unique: true, name: 'uniq_account_platform_username' });
+monitoredAccountSchema.index({ platform: 1, countryCode: 1, enabled: 1, monitoringStatus: 1 }, { name: 'account_country_monitoring' });
 
 /** @type {import('mongoose').Model} */
 export const MonitoredAccount = mongoose.models.MonitoredAccount

@@ -174,6 +174,8 @@ export function createPostIngestionService({
         publishedAt: entry.post.publishedAt?.toISOString?.() ?? null,
         detectedAt: receivedAt.toISOString(),
         category: storedAccount.category,
+        monitoredAccountId: String(storedAccount._id),
+        countryCode: storedAccount.countryCode ?? null,
       });
     } catch {
       // Event delivery is best-effort and must not undo durable post ingestion.

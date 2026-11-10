@@ -1,5 +1,9 @@
 import mongoose from 'mongoose';
 import { env } from './environment.js';
+import MonitoredAccount from '../models/MonitoredAccount.js';
+
+const COUNTRY_MONITORING_INDEX_KEYS = Object.freeze({ platform: 1, countryCode: 1, enabled: 1, monitoringStatus: 1 });
+const COUNTRY_MONITORING_INDEX_OPTIONS = Object.freeze({ name: 'account_country_monitoring' });
 
 /** Parse the configured Mongo database name without opening a connection. */
 export function resolveMongoDatabaseName(mongoUri = env.mongoUri) {
@@ -23,6 +27,11 @@ export async function connectDatabase() {
     connectTimeoutMS: 5000,
   });
   return mongoose.connection;
+}
+
+/** Ensure the country-query index exists before the HTTP server begins accepting requests. */
+export async function ensureCountryMonitoringIndex({ collection = MonitoredAccount.collection } = {}) {
+  return collection.createIndex(COUNTRY_MONITORING_INDEX_KEYS, COUNTRY_MONITORING_INDEX_OPTIONS);
 }
 
 export async function disconnectDatabase() {

@@ -144,9 +144,9 @@ test('queued and retried Nitter jobs cannot send before baseline or after Mongo 
   } });
   await MonitoredAccount.updateOne({ _id: post.monitoredAccount }, { $set: { notificationBaselineAt: new Date() } });
   const staleProcessingJob = await worker.processPostJob({ name: 'process-post', data: { postId: String(post._id) } });
-  assert.equal(staleProcessingJob.status, 'skipped');
+  assert.equal(staleProcessingJob.status, 'skipped', 'a stale processing job cannot reclaim work already marked skipped');
   const retriedQueuedJob = await worker.processNotificationJob(job);
-  assert.equal(retriedQueuedJob.status, 'skipped');
+  assert.equal(retriedQueuedJob.status, 'lease-lost');
   assert.equal(sends, 0);
   assert.equal((await Post.findById(post._id).lean()).notificationStatus, 'skipped');
 });
@@ -298,7 +298,7 @@ test('effective Nitter account blocks a queued Mock post until baseline and supp
   const atBaseline = await worker.processNotificationJob(job);
   assert.equal(atBaseline.reason, 'post-at-or-before-nitter-baseline');
   assert.equal(sends, 0);
-  assert.equal((await Post.findById(post._id).lean()).notificationStatus, 'pending');
+  assert.equal((await Post.findById(post._id).lean()).notificationStatus, 'skipped');
 });
 
 test('effective Nitter account sends a genuinely new post after its baseline', async () => {

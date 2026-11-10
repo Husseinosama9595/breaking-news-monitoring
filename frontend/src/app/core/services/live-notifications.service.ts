@@ -6,6 +6,7 @@ import {
   DesktopNotificationPermission,
   LiveEventsConnectionState,
   LivePostNotification,
+  NotificationHistoryResponse,
   NotificationSound,
   NotificationPreferences,
 } from '../models/live-notification.model';
@@ -149,6 +150,9 @@ function normalizeNotification(value: unknown): LivePostNotification | null {
   const category = typeof event['category'] === 'string' && event['category'].trim()
     ? event['category'].trim().slice(0, 100)
     : null;
+  const monitoredAccountId = typeof event['monitoredAccountId'] === 'string' ? event['monitoredAccountId'].slice(0, 64) : null;
+  const countryCode = typeof event['countryCode'] === 'string' && /^[A-Z]{2}$/.test(event['countryCode']) ? event['countryCode'] : null;
+  const countryName = typeof event['countryName'] === 'string' ? event['countryName'].trim().slice(0, 100) || null : null;
   return {
     eventId: eventId.slice(0, 128),
     notificationId: notificationId.slice(0, 128),
@@ -161,6 +165,9 @@ function normalizeNotification(value: unknown): LivePostNotification | null {
     detectedAt,
     readAt: validDate(event['readAt']),
     category,
+    monitoredAccountId,
+    countryCode,
+    countryName,
     read: event['read'] === true || validDate(event['readAt']) !== null,
   };
 }
@@ -171,6 +178,7 @@ export class LiveNotificationsService {
   private readonly notificationsApi = inject(NotificationsApiService);
   private readonly streamUrl = `${getApiBaseUrl(environment.apiBaseUrl).replace(/\/+$/, '')}/api/events/stream`;
   private readonly notificationState = signal<LivePostNotification[]>([]);
+  private readonly lastLiveNotificationState = signal<LivePostNotification | null>(null);
   private readonly unreadCountState = signal(0);
   private readonly historyLoadingState = signal(false);
   private readonly historyErrorState = signal('');
@@ -201,6 +209,7 @@ export class LiveNotificationsService {
   private lastConnectionAt: string | null = null;
 
   readonly notifications = this.notificationState.asReadonly();
+  readonly lastLiveNotification = this.lastLiveNotificationState.asReadonly();
   readonly toastIds = this.toastIdState.asReadonly();
   readonly connectionState = this.connectionStateState.asReadonly();
   readonly preferences = this.preferencesState.asReadonly();
@@ -371,6 +380,31 @@ export class LiveNotificationsService {
     this.flushBufferedEvents(connectionAt);
   }
 
+  /** Refresh already loaded REST history after an account's current country changes. */
+  async refreshLoadedHistory(): Promise<void> {
+    const loadedPageCount = Math.max(1, this.historyPageState());
+    this.historyLoadingState.set(true);
+    this.historyErrorState.set('');
+    try {
+      const notifications: LivePostNotification[] = [];
+      let latestResponse: NotificationHistoryResponse | null = null;
+      for (let page = 1; page <= loadedPageCount; page += 1) {
+        latestResponse = await firstValueFrom(this.notificationsApi.getNotifications({ page, limit: INITIAL_HISTORY_LIMIT }));
+        notifications.push(...latestResponse.notifications.map(normalizeNotification).filter((item): item is LivePostNotification => item !== null));
+      }
+      if (latestResponse) {
+        this.mergeNotifications(notifications);
+        this.unreadCountState.set(latestResponse.unreadCount);
+        this.historyTotalState.set(latestResponse.pagination.total);
+        this.historyHasMoreState.set(this.historyPageState() < latestResponse.pagination.totalPages);
+      }
+    } catch {
+      this.historyErrorState.set('Could not refresh notification country context. Live updates remain connected.');
+    } finally {
+      this.historyLoadingState.set(false);
+    }
+  }
+
   dismissToast(postId: string): void {
     const timer = this.toastTimers.get(postId);
     if (timer) clearTimeout(timer);
@@ -484,6 +518,7 @@ export class LiveNotificationsService {
   private addNotification(notification: LivePostNotification): void {
     if (this.seenPostIds.has(notification.notificationId)) return;
     this.seenPostIds.add(notification.notificationId);
+    this.lastLiveNotificationState.set(notification);
     this.mergeNotifications([notification]);
     if (!notification.read) this.unreadCountState.update((count) => count + 1);
     this.playSoundForNewPost();

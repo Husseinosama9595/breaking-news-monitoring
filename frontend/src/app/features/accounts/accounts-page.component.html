@@ -38,6 +38,10 @@
             <div><label for="account-category">Category</label><select id="account-category" formControlName="category">@for (category of categories; track category) { <option [value]="category">{{ category }}</option> }</select></div>
             <div><label for="account-provider">Provider</label><select id="account-provider" formControlName="providerName"><option value="">Backend default</option><option value="nitter">Nitter</option><option value="mock">Mock</option></select></div>
           </div>
+          <label for="account-country">Country <small>Optional · searchable</small></label>
+          <input id="account-country" type="search" formControlName="countrySelection" list="country-options" autocomplete="off" placeholder="Search country or leave unassigned" />
+          <datalist id="country-options">@for (country of countryOptions(); track country.countryCode) { <option [value]="countryOptionLabel(country)"></option> }</datalist>
+          <small class="country-help">Country is a manual organization label; it is not inferred from posts.</small>
           @if (!editingAccount()) { <p class="activation-note"><i class="bi bi-info-circle"></i> New accounts start enabled. Nitter establishes a baseline on the first successful poll to suppress older posts.</p> }
           @if (mutationError()) { <div class="form-error" role="alert">{{ mutationError() }}</div> }
           <footer class="dialog-actions"><button class="cancel-button" type="button" [disabled]="saving()" (click)="closeForm()">Cancel</button><button class="add-button" type="submit" [disabled]="saving() || form.invalid">@if (saving()) { <span class="spinner"></span> Saving… } @else { {{ editingAccount() ? 'Save changes' : 'Add account' }} }</button></footer>
@@ -46,15 +50,30 @@
     </div>
   }
 
+  @if (countryCounts()?.countries?.length) {
+    <section class="country-count-strip" aria-label="Account counts by country">
+      @for (country of countryCounts()!.countries; track country.countryCode) { <span>{{ countryFlag(country.countryCode) }} {{ country.countryName }} <strong>{{ country.accountCount }}</strong></span> }
+      @if ((countryCounts()?.unassigned?.accountCount ?? 0) > 0) { <span>🌐 Unassigned <strong>{{ countryCounts()?.unassigned?.accountCount }}</strong></span> }
+    </section>
+  }
+
   <section class="roster-panel" aria-label="Monitored account list">
+    <div class="account-search-row" [formGroup]="searchForm">
+      <label class="account-search-input"><i class="bi bi-search" aria-hidden="true"></i><input formControlName="search" type="search" placeholder="Search usernames or display names" aria-label="Search accounts by username or display name" (input)="onSearchInput($event)" /></label>
+      <button class="account-search-clear" type="button" [disabled]="!activeSearch() && !searchForm.controls.search.value" (click)="clearSearch()">Clear search</button>
+    </div>
     <div class="roster-toolbar">
       <div class="count-label">
         <span class="toolbar-mark"></span>
         @if (loading()) { <span>Loading account roster</span> }
         @else if (errorMessage()) { <span>Account roster unavailable</span> }
-        @else { <span>{{ accounts().length }} {{ accounts().length === 1 ? 'account' : 'accounts' }}</span> }
+        @else { <span>{{ totalAccounts() }} {{ totalAccounts() === 1 ? 'account' : 'accounts' }} matching</span> }
       </div>
-      <span class="source-note">SOURCE: BACKEND ACCOUNT API</span>
+      <div class="roster-filters">
+        <label><span class="visually-hidden">Filter by country</span><select [value]="countryFilter()" (change)="setCountryFilter($any($event.target).value)" aria-label="Filter accounts by country"><option value="">All countries</option>@for (country of countryOptions(); track country.countryCode) { <option [value]="country.countryCode">{{ country.countryName }}</option> }<option value="unassigned">Unassigned</option></select></label>
+        <label><span class="visually-hidden">Filter by account status</span><select [value]="statusFilter()" (change)="setStatusFilter($any($event.target).value)" aria-label="Filter accounts by status"><option value="all">All statuses</option><option value="enabled">Enabled</option><option value="disabled">Disabled</option><option value="error">Polling errors</option></select></label>
+        <span class="source-note">SOURCE: BACKEND ACCOUNT API</span>
+      </div>
     </div>
 
     @if (loading()) {
@@ -70,11 +89,11 @@
         <p>{{ errorMessage() }}</p>
         <button class="retry-button" type="button" (click)="loadAccounts()">Try again <i class="bi bi-arrow-right"></i></button>
       </div>
-    } @else if (accounts().length === 0) {
+    } @else if (visibleAccounts().length === 0) {
       <div class="state-panel" role="status">
         <span class="state-icon"><i class="bi bi-broadcast"></i></span>
         <strong>No monitored accounts yet</strong>
-        <p>The backend returned an empty account list.</p>
+        <p>{{ activeSearch() || countryFilter() || statusFilter() !== 'all' ? 'No accounts match the selected search and filters.' : 'The backend returned an empty account list.' }}</p>
       </div>
     } @else {
       <div class="table-scroll">
@@ -83,6 +102,7 @@
             <tr>
               <th scope="col">ACCOUNT</th>
               <th scope="col">CATEGORY</th>
+              <th scope="col">COUNTRY</th>
               <th scope="col">PROVIDER</th>
               <th scope="col">MONITORING</th>
               <th scope="col">ENABLED</th>
@@ -93,7 +113,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (account of accounts(); track account._id) {
+            @for (account of visibleAccounts(); track account._id) {
               <tr>
                 <td>
                   <div class="account-cell">
@@ -105,6 +125,7 @@
                   </div>
                 </td>
                 <td><span class="category-label">{{ account.category }}</span></td>
+                <td><span class="account-country-label">{{ countryFlag(account.countryCode) }} {{ countryLabel(account) }}</span></td>
                 <td><span class="provider-label">{{ account.providerName }}</span></td>
                 <td>
                   <span class="status-label" [class.status-active]="account.monitoringStatus === 'active'" [class.status-paused]="account.monitoringStatus === 'paused'" [class.status-error]="account.monitoringStatus === 'error'">
@@ -149,7 +170,8 @@
           </tbody>
         </table>
       </div>
-      <div class="table-footer"><span>Showing {{ accounts().length }} {{ accounts().length === 1 ? 'account' : 'accounts' }}</span><span>ACCOUNT MANAGEMENT</span></div>
+      <div class="table-footer"><span>Showing {{ visibleAccounts().length }} of {{ totalAccounts() }} matching accounts</span><span>ACCOUNT MANAGEMENT</span></div>
+      @if (totalPages() > 1) { <nav class="account-pagination" aria-label="Account roster pages"><span>Page {{ page() }} of {{ totalPages() }}</span><div><button type="button" [disabled]="page() <= 1 || loading()" (click)="changePage(page() - 1)">Previous</button><button type="button" [disabled]="page() >= totalPages() || loading()" (click)="changePage(page() + 1)">Next</button></div></nav> }
     }
   </section>
 </div>

@@ -1,12 +1,14 @@
 import mongoose from 'mongoose';
 import Post from '../models/Post.js';
+import MonitoredAccount from '../models/MonitoredAccount.js';
 import { safeXPostUrl } from '../utils/xPostUrl.js';
+import { countryNameForCode, normalizeCountryCode } from '../data/countryCatalog.js';
 
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 20;
-const ALLOWED_QUERY = new Set(['page', 'limit', 'since']);
+const ALLOWED_QUERY = new Set(['page', 'limit', 'since', 'country']);
 const NOTIFICATION_SELECT = [
-  '_id', 'username', 'author', 'text', 'postUrl', 'publishedAt', 'category',
+  '_id', 'monitoredAccount', 'username', 'author', 'text', 'postUrl', 'publishedAt', 'category',
   'dashboardNotification.createdAt', 'dashboardNotification.readAt',
 ].join(' ');
 
@@ -36,7 +38,18 @@ function parseListQuery(query) {
     }
     since = new Date(query.since);
   }
-  return { value: { page: page.value, limit: limit.value, since } };
+  let countryCode;
+  let unassigned = false;
+  if (query.country !== undefined) {
+    if (typeof query.country !== 'string') return { error: 'country must be an ISO alpha-2 code or unassigned' };
+    if (query.country.toLowerCase() === 'unassigned') unassigned = true;
+    else {
+      const country = normalizeCountryCode(query.country);
+      if (country.error) return { error: 'country must be a valid ISO 3166-1 alpha-2 code or unassigned' };
+      countryCode = country.value;
+    }
+  }
+  return { value: { page: page.value, limit: limit.value, since, countryCode, unassigned } };
 }
 
 function dateString(value) {
@@ -57,6 +70,9 @@ function notificationDto(post) {
     publishedAt: dateString(post.publishedAt),
     detectedAt: dateString(meta?.createdAt),
     category: post.category ?? null,
+    monitoredAccountId: post.monitoredAccount?._id ? String(post.monitoredAccount._id) : null,
+    countryCode: post.monitoredAccount?.countryCode ?? null,
+    countryName: countryNameForCode(post.monitoredAccount?.countryCode ?? null),
     readAt: dateString(meta?.readAt),
     read: Boolean(meta?.readAt),
   };
@@ -69,20 +85,39 @@ const unreadFilter = {
 };
 
 /** Create protected notification history handlers backed by the Post ledger. */
-export function createNotificationController({ postModel = Post, clock = () => new Date() } = {}) {
+export function createNotificationController({ postModel = Post, accountModel = MonitoredAccount, clock = () => new Date() } = {}) {
   async function list(req, res) {
     const parsed = parseListQuery(req.query ?? {});
     if (parsed.error) return res.status(400).json({ error: parsed.error });
-    const { page, limit, since } = parsed.value;
+    const { page, limit, since, countryCode, unassigned } = parsed.value;
     const filter = { ...hasNotification };
     if (since) filter['dashboardNotification.createdAt'] = { $exists: true, $gte: since };
     try {
+      if (countryCode !== undefined || unassigned) {
+        const accountFilter = { platform: 'x' };
+        if (unassigned) accountFilter.$or = [{ countryCode: null }, { countryCode: { $exists: false } }];
+        else accountFilter.countryCode = countryCode;
+        const accounts = await accountModel.find(accountFilter).select('_id').lean();
+        if (!accounts.length) {
+          const unreadCount = await postModel.countDocuments({ ...unreadFilter, monitoredAccount: { $in: [] } });
+          return res.json({
+            notifications: [],
+            pagination: { page, limit, total: 0, totalPages: 0 },
+            unreadCount,
+            serverTime: clock().toISOString(),
+          });
+        }
+        filter.monitoredAccount = { $in: accounts.map((account) => account._id) };
+      }
+      const scopedUnreadFilter = filter.monitoredAccount
+        ? { ...unreadFilter, monitoredAccount: filter.monitoredAccount }
+        : unreadFilter;
       const [posts, total, unreadCount] = await Promise.all([
-        postModel.find(filter).select(NOTIFICATION_SELECT)
+        postModel.find(filter).select(NOTIFICATION_SELECT).populate('monitoredAccount', 'countryCode')
           .sort({ 'dashboardNotification.createdAt': -1, _id: -1 })
           .skip((page - 1) * limit).limit(limit).lean(),
         postModel.countDocuments(filter),
-        postModel.countDocuments(unreadFilter),
+        postModel.countDocuments(scopedUnreadFilter),
       ]);
       return res.json({
         notifications: posts.map(notificationDto),
@@ -113,10 +148,10 @@ export function createNotificationController({ postModel = Post, clock = () => n
         { ...filter, 'dashboardNotification.readAt': null },
         { $set: { 'dashboardNotification.readAt': clock() } },
         { new: true },
-      ).select(NOTIFICATION_SELECT).lean();
+      ).select(NOTIFICATION_SELECT).populate('monitoredAccount', 'countryCode').lean();
       if (updated) return res.json({ notification: notificationDto(updated) });
 
-      const existing = await postModel.findOne(filter).select(NOTIFICATION_SELECT).lean();
+      const existing = await postModel.findOne(filter).select(NOTIFICATION_SELECT).populate('monitoredAccount', 'countryCode').lean();
       if (!existing) return res.status(404).json({ error: 'Notification not found' });
       return res.json({ notification: notificationDto(existing) });
     } catch {

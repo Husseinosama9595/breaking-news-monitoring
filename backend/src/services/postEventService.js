@@ -1,4 +1,5 @@
 import { safeXPostUrl } from '../utils/xPostUrl.js';
+import { countryNameForCode, isValidCountryCode } from '../data/countryCatalog.js';
 
 const subscribers = new Set();
 
@@ -25,6 +26,12 @@ export function normalizePostCreatedEvent(value) {
   const displayName = typeof value.displayName === 'string' && value.displayName.trim()
     ? value.displayName.trim().slice(0, 120)
     : null;
+  const monitoredAccountId = typeof value.monitoredAccountId === 'string' && value.monitoredAccountId.trim()
+    ? value.monitoredAccountId.trim().slice(0, 64)
+    : null;
+  const countryCode = typeof value.countryCode === 'string' && isValidCountryCode(value.countryCode)
+    ? value.countryCode
+    : null;
 
   return Object.freeze({
     eventId: eventId.slice(0, 128),
@@ -37,6 +44,9 @@ export function normalizePostCreatedEvent(value) {
     publishedAt,
     detectedAt,
     category,
+    monitoredAccountId,
+    countryCode,
+    countryName: countryNameForCode(countryCode),
   });
 }
 

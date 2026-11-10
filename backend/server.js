@@ -1,6 +1,6 @@
 import app from './src/app.js';
 import { env } from './src/config/environment.js';
-import { connectDatabase, disconnectDatabase } from './src/config/database.js';
+import { connectDatabase, disconnectDatabase, ensureCountryMonitoringIndex } from './src/config/database.js';
 import { connectRedis, disconnectRedis } from './src/config/redis.js';
 import { closeQueues } from './src/queues/notificationQueue.js';
 import { feedPollingService } from './src/services/feedPollingService.js';
@@ -12,6 +12,8 @@ let shuttingDown = false;
 
 async function start() {
   await connectDatabase();
+  await ensureCountryMonitoringIndex();
+  console.info('Country monitoring index is ready.');
 
   if (env.redisUrl) {
     try {

@@ -5,9 +5,10 @@
       <h2 id="history-title">Notification history</h2>
       <p>Saved notifications from eligible posts detected by the monitor.</p>
     </div>
-    <button class="mark-all-button" type="button" [disabled]="liveNotifications.unreadCount() === 0 || liveNotifications.markAllPending()" (click)="markAllRead()">
-      <i class="bi bi-check2-all" aria-hidden="true"></i> Mark all as read
-    </button>
+    <div class="history-heading-actions">
+      <label class="country-history-filter">Country <select [value]="countryFilter()" (change)="changeCountry($any($event.target).value)" aria-label="Filter notifications by country"><option value="all">All countries</option>@for (country of countries(); track country.countryCode) { <option [value]="country.countryCode">{{ countryFlag(country.countryCode) }} {{ country.countryName }}</option> }<option value="unassigned">Unassigned</option></select></label>
+      <button class="mark-all-button" type="button" [disabled]="markAllDisabled" [title]="countryFilter() === 'all' ? 'Mark all notifications as read' : 'Choose All countries to mark all notifications read'" (click)="markAllRead()"><i class="bi bi-check2-all" aria-hidden="true"></i> Mark all as read</button>
+    </div>
   </header>
 
   <aside class="history-notice" role="note">
@@ -17,18 +18,18 @@
 
   @if (liveNotifications.historyActionError()) { <div class="history-error" role="alert">{{ liveNotifications.historyActionError() }}</div> }
 
-  @if (liveNotifications.historyError()) {
-    <div class="history-error" role="alert"><span>{{ liveNotifications.historyError() }}</span><button type="button" (click)="retry()">Retry</button></div>
+  @if (historyError()) {
+    <div class="history-error" role="alert"><span>{{ historyError() }}</span><button type="button" (click)="retry()">Retry</button></div>
   }
 
   <section class="history-panel" aria-label="Saved notifications">
-    @if (liveNotifications.notifications().length > 0) {
+    @if (notifications().length > 0) {
       <div class="history-toolbar">
-        <span><strong>{{ liveNotifications.notifications().length }}</strong> saved notifications</span>
-        <span class="unread-summary">{{ liveNotifications.unreadCount() }} unread</span>
+        <span><strong>{{ notifications().length }}</strong> displayed of {{ historyTotal() }}</span>
+        <span class="unread-summary">{{ unreadCount() }} unread</span>
       </div>
       <ol class="notification-list">
-        @for (notification of liveNotifications.notifications(); track notification.postId) {
+        @for (notification of notifications(); track notification.postId) {
           <li class="notification-item" [class.is-unread]="!notification.read">
             <span class="timeline-marker" aria-hidden="true"><i class="bi" [class.bi-lightning-charge-fill]="!notification.read" [class.bi-check2]="notification.read"></i></span>
             <article class="notification-content">
@@ -37,6 +38,7 @@
                   <strong>@{{ notification.username }}</strong>
                   @if (notification.displayName) { <span>{{ notification.displayName }}</span> }
                   @if (notification.category) { <span class="category-pill">{{ notification.category }}</span> }
+                  @if (notification.countryName) { <span class="category-pill">{{ countryFlag(notification.countryCode) }} {{ notification.countryName }}</span> }
                 </div>
                 <span class="read-state" [class.unread-state]="!notification.read">{{ notification.read ? 'Read' : 'Unread' }}</span>
               </div>
@@ -54,7 +56,7 @@
                   <span class="link-unavailable">Original link unavailable</span>
                 }
                 @if (!notification.read) {
-                  <button type="button" class="mark-read-button" [disabled]="liveNotifications.isReadPending(notification.notificationId)" [attr.aria-label]="'Mark notification from @' + notification.username + ' as read'" (click)="markRead(notification)">
+                  <button type="button" class="mark-read-button" [disabled]="isReadPending(notification.notificationId) || historyLoading()" [attr.aria-label]="'Mark notification from @' + notification.username + ' as read'" (click)="markRead(notification)">
                     <i class="bi bi-check2" aria-hidden="true"></i> Mark as read
                   </button>
                 }
@@ -63,7 +65,7 @@
           </li>
         }
       </ol>
-    } @else if (liveNotifications.historyLoading() || liveNotifications.connectionState() === 'connecting') {
+    } @else if (historyLoading() || liveNotifications.connectionState() === 'connecting') {
       <div class="history-state" role="status"><span class="spinner" aria-hidden="true"></span><strong>Loading notification history</strong><p>Restoring saved notifications and connecting live updates.</p></div>
     } @else {
       <div class="history-state">
@@ -73,10 +75,10 @@
         @if (liveNotifications.connectionState() === 'disconnected') { <span class="connection-note"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Live updates are reconnecting or unavailable.</span> }
       </div>
     }
-    @if (liveNotifications.historyHasMore() && liveNotifications.notifications().length > 0) {
-      <div class="load-older-row"><button type="button" [disabled]="liveNotifications.historyLoading()" (click)="loadOlder()">
-        @if (liveNotifications.historyLoading()) { <span class="spinner small" aria-hidden="true"></span> Loading… } @else { Load older notifications }
-      </button><span>{{ liveNotifications.notifications().length }} of {{ liveNotifications.historyTotal() }}</span></div>
+    @if (historyPage() < historyTotalPages() && notifications().length > 0) {
+      <div class="load-older-row"><button type="button" [disabled]="historyLoading()" (click)="loadOlder()">
+        @if (historyLoading()) { <span class="spinner small" aria-hidden="true"></span> Loading… } @else { Load older notifications }
+      </button><span>{{ notifications().length }} of {{ historyTotal() }}</span></div>
     }
   </section>
 </section>

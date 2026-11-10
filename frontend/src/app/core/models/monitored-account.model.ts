@@ -37,6 +37,8 @@ export interface MonitoredAccount {
   username: string;
   displayName: string | null;
   category: AccountCategory;
+  countryCode?: string | null;
+  countryName?: string | null;
   enabled: boolean;
   providerName: string;
   monitoringStatus: AccountMonitoringStatus;
@@ -48,6 +50,7 @@ export interface MonitoredAccount {
 
 export interface MonitoredAccountsResponse {
   accounts: MonitoredAccount[];
+  pagination?: { page: number; limit: number; total: number; totalPages: number };
 }
 
 export interface MonitoredAccountResponse {
@@ -58,6 +61,7 @@ export interface CreateMonitoredAccountRequest {
   username: string;
   displayName?: string | null;
   category?: AccountCategory;
+  countryCode?: string | null;
   providerName?: string;
 }
 
@@ -65,5 +69,6 @@ export interface UpdateMonitoredAccountRequest {
   username?: string;
   displayName?: string | null;
   category?: AccountCategory;
+  countryCode?: string | null;
   providerName?: string;
 }

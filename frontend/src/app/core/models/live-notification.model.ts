@@ -22,6 +22,9 @@ export interface LivePostNotification {
   detectedAt: string;
   readAt: string | null;
   category: string | null;
+  monitoredAccountId?: string | null;
+  countryCode?: string | null;
+  countryName?: string | null;
   read: boolean;
 }
 
