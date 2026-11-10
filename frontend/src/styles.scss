@@ -209,6 +209,206 @@ input,select,textarea { accent-color:var(--app-accent); }
 :root[data-theme='dark'] .monitor-badge.connected { background:#1f6555 !important; color:#dcfff0 !important; }
 @media (prefers-reduced-motion:reduce) { .connection-status.connected .status-lamp::after,.feed-entry,.post-card,.account-row,.notification-item { animation:none; } }
 
+/* Application-wide readability scale */
+:root {
+  --app-sidebar-width: 274px;
+  --ui-body: 16px;
+  --ui-control: 15px;
+  --ui-button: 14px;
+  --ui-secondary: 14px;
+  --ui-metadata: 13px;
+  --ui-title: clamp(28px, 2.7vw, 35px);
+  --ui-section-title: 21px;
+  --ui-card-title: 18px;
+}
+
+body { font-size: var(--ui-body); }
+body .page-content { padding: 36px 42px 48px; }
+
+body :is(.breadcrumb, .console-footer, .nav-label, .monitor-label, .eyebrow, .panel-kicker, .login-kicker) {
+  font-size: 12px !important;
+}
+body :is(.side-nav a, .country-nav-toggle, .country-nav-link, .collapse-toggle) {
+  font-size: 14px !important;
+}
+body :is(.side-nav a i, .country-nav-toggle > i:first-child) { font-size: 19px !important; }
+body .brand-copy strong { font-size: 13px !important; }
+body .brand-copy small { font-size: 10px !important; }
+body .heading-group h1 { font-size: 20px !important; }
+body .global-search { width: 260px; height: 42px; font-size: 13px !important; }
+body .connection-status, body .topbar-profile { font-size: 13px !important; }
+body .theme-toggle, body .notification-bell { width: 42px; height: 42px; }
+body .theme-toggle i, body .notification-bell > i { font-size: 19px !important; }
+
+body :is(.page-heading h2, .page-intro h2, .country-heading h2) {
+  font-size: var(--ui-title) !important;
+  line-height: 1.2;
+}
+body :is(.page-heading p, .page-intro p, .country-heading p, .monitor-copy p, .login-subtitle) {
+  font-size: 15px !important;
+}
+body :is(.panel-heading h3, .country-panel h3, .section-heading h3) {
+  font-size: var(--ui-section-title) !important;
+}
+body :is(.kpi-heading, .kpi-caption, .account-health-details, .kpi-item small) {
+  font-size: 13px !important;
+}
+body .kpi-heading { letter-spacing: .55px; }
+body .kpi-number { font-size: 36px !important; }
+body .kpi-item { min-height: 145px; padding: 22px 23px; }
+body .monitor-copy h3 { font-size: 22px !important; }
+body .monitor-badge { font-size: 13px !important; }
+body .entry-text { font-size: 15px !important; line-height: 1.75; }
+body .feed-entry { padding: 22px 24px; }
+
+body :is(input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea) {
+  font-size: var(--ui-control) !important;
+}
+body :is(.account-dialog input, .account-dialog select, .input-wrap, .control-row select,
+  .filter-search, .select-wrap, .roster-filters select, .country-filters input, .country-filters select) {
+  min-height: 46px;
+}
+body :is(.refresh-button, .add-button, .retry-button, .cancel-button, .filter-submit, .clear-filters,
+  .pagination-bar button, .mark-all-button, .mark-read-button, .load-older-row button,
+  .country-filters button, .country-pagination button, .submit-button, .preview-button,
+  .section-links a, .account-search-submit, .account-search-clear, .account-pagination button) {
+  min-height: 42px;
+  padding-inline: 15px;
+  font-size: var(--ui-button) !important;
+}
+body :is(.row-actions button, .text-action, .icon-button, .logout-button, .visibility-toggle, .mark-one, .toast-close, .toast-dismiss) {
+  font-size: 14px !important;
+}
+
+/* Accounts roster and account controls */
+body .accounts-table { min-width: 1120px; }
+body .accounts-table th { padding: 15px 16px; font-size: 13px !important; }
+body .accounts-table td { padding: 17px 16px; font-size: 14px !important; }
+body .account-identity strong { font-size: 15px !important; }
+body .account-identity small, body .date-cell { font-size: 13px !important; }
+body :is(.status-label, .enabled-label, .freshness-badge, .poll-outcome, .category-label, .provider-label) {
+  font-size: 12px !important;
+}
+body .health-details { font-size: 13px !important; }
+body .health-details-panel { padding: 16px; }
+body :is(.health-details-panel dt, .health-details-panel dd, .freshness-note, .provider-error-code) {
+  font-size: 13px !important;
+}
+body .account-dialog { padding: 28px; }
+body .dialog-heading h3 { font-size: 24px !important; }
+body :is(.account-dialog form > label, .form-row label, .account-dialog label small, .field-error, .form-error) {
+  font-size: 14px !important;
+}
+body .activation-note { font-size: 14px !important; padding: 13px 14px; }
+
+/* Posts and country feeds */
+body .post-text, body .country-post p { font-size: 16px !important; line-height: 1.75; }
+body :is(.author-block strong, .post-byline strong, .source-copy strong) { font-size: 15px !important; }
+body :is(.author-block small, .post-byline, .source-copy small, .pagination-bar, .country-pagination) {
+  font-size: 13px !important;
+}
+body :is(.priority, .category, .provider, .process-state, .delivery-state,
+  .topic-pill, .delivery-pill, .panel-count, .country-total) {
+  font-size: 12px !important;
+  padding: 6px 10px;
+}
+body .post-content { padding: 24px 27px; }
+body .post-footer { padding-top: 16px; }
+body .country-post { padding: 21px 23px; }
+body .country-post footer a { font-size: 14px !important; }
+body .source-list li { padding-block: 16px; }
+body .source-avatar { width: 38px; height: 38px; flex-basis: 38px; font-size: 17px; }
+body .source-enabled { font-size: 13px !important; }
+body .feed-empty, body .country-state, body .state-panel, body .feed-state, body .history-state {
+  font-size: 15px !important;
+}
+body :is(.state-panel > strong, .feed-state > strong, .history-state > strong) {
+  font-size: 17px !important;
+}
+body :is(.state-panel > p, .feed-state > p, .history-state > p) { font-size: 14px !important; }
+
+/* Notifications, persistent history, and both toast surfaces */
+/* backdrop-filter creates a containing block; disable it only while its fixed panel is open. */
+body .topbar:has(app-notification-center .notification-panel) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+body .panel-header { padding: 18px 20px; }
+body .panel-header strong { font-size: 16px !important; }
+body .panel-header small, body .mark-all { font-size: 13px !important; }
+body .notification-list li { gap: 12px; padding: 16px 18px; }
+body .notification-copy > strong { font-size: 15px !important; }
+body .notification-category { font-size: 12px !important; padding: 4px 8px; }
+body .notification-copy p { font-size: 14px !important; line-height: 1.6; }
+body :is(.notification-copy time, .notification-copy a, .no-link, .permission-status, .preference-note) {
+  font-size: 12px !important;
+}
+body .mark-one { width: 34px; height: 34px; flex-basis: 34px; }
+body .notification-preferences summary { padding: 15px 18px; font-size: 14px !important; }
+body .preferences-content { gap: 12px; padding: 4px 17px 17px; }
+body .preference-row { padding: 12px 13px; }
+body .preference-row strong, body .sound-control { font-size: 14px !important; }
+body .preference-row small, body .sound-control small { font-size: 12px !important; }
+body .sound-control select { min-height: 42px; font-size: 14px !important; }
+body .preference-row input { width: 19px; height: 19px; flex-basis: 19px; }
+body .preview-sound { min-height: 40px; padding: 8px 12px; font-size: 13px !important; }
+body .toast-stack { width: min(460px, calc(100vw - 32px)) !important; gap: 12px; }
+body .post-toast { grid-template-columns: 38px minmax(0, 1fr) 34px; gap: 12px; padding: 17px; }
+body .toast-mark { width: 38px; height: 38px; font-size: 17px !important; }
+body .toast-copy > strong { font-size: 16px !important; }
+body .toast-source, body .toast-copy p { font-size: 14px !important; }
+body .toast-copy time, body .toast-copy a { font-size: 13px !important; }
+body .toast-dismiss { width: 34px; height: 34px; }
+body .app-toast-viewport { width: min(470px, calc(100vw - 32px)) !important; gap: 12px; }
+body .app-toast { gap: 14px; padding: 18px 17px; border-radius: 17px; }
+body .toast-icon { width: 40px; height: 40px; flex-basis: 40px; font-size: 18px; }
+body .toast-message strong { font-size: 17px !important; }
+body .toast-message p { margin-top: 6px; font-size: 15px !important; line-height: 1.55; }
+body .toast-action { padding: 8px 10px; font-size: 14px !important; }
+body .toast-close { width: 36px; height: 36px; color: var(--app-ink); }
+body .toast-success { border-color: color-mix(in srgb, var(--app-green) 35%, var(--app-border)); }
+body .toast-error { border-color: color-mix(in srgb, var(--app-critical) 40%, var(--app-border)); }
+body .toast-warning { border-color: color-mix(in srgb, var(--app-amber) 42%, var(--app-border)); }
+body :is(.toast-info, .toast-loading) { border-color: color-mix(in srgb, var(--app-accent) 36%, var(--app-border)); }
+
+/* Login and settings */
+body .login-panel { width: min(100%, 460px); padding: 44px; }
+body .login-panel h1 { font-size: 36px !important; }
+body .field-group label { font-size: 15px !important; }
+body .input-wrap { height: 54px; }
+body .input-wrap input { font-size: 16px !important; }
+body .submit-button { height: 52px; }
+body :is(.field-error, .error-banner, .login-footnote, .login-subtitle) { font-size: 14px !important; }
+body .section-heading h3 { font-size: 19px !important; }
+body .section-heading p { font-size: 14px !important; }
+body :is(.preference-row strong, .control-row strong) { font-size: 15px !important; }
+body :is(.preference-row small, .control-row small, .app-info dt, .app-info dd, .preview-row > span,
+  .permission-status, .section-links a, .control-row select) { font-size: 14px !important; }
+body .settings-section { padding: 27px clamp(18px, 3vw, 30px); }
+
+@media (max-width: 1080px) {
+  body .page-content { padding-inline: 26px; }
+  body .global-search { width: 210px; }
+}
+@media (max-width: 820px) {
+  body .page-content { padding: 28px 22px 36px; }
+  body .heading-group h1 { font-size: 18px !important; }
+}
+@media (max-width: 650px) {
+  body .page-content { padding: 23px 15px 32px; }
+  body :is(.page-heading h2, .page-intro h2, .country-heading h2) { font-size: 28px !important; }
+  body .kpi-item { min-height: 120px; padding: 17px; }
+  body .kpi-number { font-size: 31px !important; }
+  body .post-content { padding: 18px 16px; }
+  body .country-post { padding: 17px 15px; }
+  body .app-toast-viewport { top: 74px; right: 10px; left: 10px; width: auto !important; }
+  body .toast-stack { top: 74px; right: 10px; left: 10px; bottom: 10px; width: auto !important; }
+  body .app-toast { gap: 10px; padding: 15px 13px; }
+  body .toast-message p { font-size: 14px !important; }
+  body .login-panel { padding: 30px 24px; }
+  body .settings-section { padding: 20px 16px; }
+}
+
 .country-overview-panel { margin:0 0 17px; padding:19px; border:1px solid var(--app-border); border-radius:19px; background:var(--app-surface); box-shadow:var(--app-shadow-card); }
 .country-total { padding:6px 10px; border-radius:999px; background:var(--app-accent-soft); color:var(--app-accent-dark); font-size:11px; font-weight:750; }
 .country-card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(205px,1fr)); gap:10px; }
@@ -226,3 +426,37 @@ input,select,textarea { accent-color:var(--app-accent); }
 .account-pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 18px; border-top:1px solid var(--app-border); color:var(--app-muted); font-size:11px; }.account-pagination>div { display:flex; gap:7px; }
 @media(max-width:520px) { .account-search-row { flex-wrap:wrap; padding-inline:12px; }.account-search-input { flex-basis:100%; }.account-search-submit,.account-search-clear { flex:1; }.account-pagination { padding-inline:12px; } }
 @media(max-width:600px) { .country-overview-panel { padding:15px; }.country-card-grid { grid-template-columns:1fr 1fr; }.country-card { grid-template-columns:27px minmax(0,1fr); padding:10px; }.country-card-health { font-size:9px; } }
+
+/* Keep the sidebar within the viewport and let its navigation scroll when needed. */
+.sidebar { height:100vh; height:100dvh; min-height:0; overflow:hidden; }
+.sidebar-content { display:flex; min-height:0; flex:1 1 auto; flex-direction:column; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; }
+.sidebar-content>:not(.sidebar-spacer) { flex-shrink:0; }
+.sidebar-spacer { flex:1 0 25px; }
+
+/* Keep the header usable as the sidebar and page compete for less horizontal space. */
+.mobile-brand-mark { display:none; }
+@media (min-width:768px) and (max-width:1199px) {
+  body .topbar { gap:14px; padding-inline:20px; }
+  body .heading-group { min-width:0; flex:1 1 0; }
+  body .topbar-tools { min-width:0; flex:0 1 auto; gap:8px; }
+  body .global-search { width:min(230px,25vw); min-width:140px; flex:1 1 180px; }
+  body .connection-status { min-width:0; max-width:170px; }
+  body .connection-status>span:last-child { overflow:hidden; text-overflow:ellipsis; }
+}
+@media (max-width:767px) {
+  body .topbar { display:grid; grid-template-columns:minmax(0,1fr) 10px 42px 42px; gap:8px; min-height:0; padding:10px 14px; }
+  body .heading-group { grid-column:1; grid-row:1; min-width:0; gap:8px; }
+  body .menu-toggle { flex:0 0 36px; margin:0; }
+  body .mobile-brand-mark { display:grid; width:32px; height:32px; flex:0 0 32px; place-items:center; }
+  body .mobile-brand-mark .brand-mark { width:32px; height:32px; flex:0 0 32px; border-radius:10px; font-size:16px; }
+  body .title-stack { min-width:0; overflow:hidden; }
+  body .breadcrumb strong { display:block; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  body .topbar-tools { display:contents !important; }
+  body .global-search { grid-column:1/-1; grid-row:2; width:100% !important; min-width:0; height:40px; flex:none; }
+  body .connection-status { grid-column:2; grid-row:1; width:10px; max-width:10px; justify-self:center; overflow:hidden; font-size:0; }
+  body .theme-toggle { grid-column:3; grid-row:1; }
+  body app-notification-center { grid-column:4; grid-row:1; display:block; }
+  body .topbar-profile { display:none; }
+  body .notification-panel { top:max(112px,calc(env(safe-area-inset-top) + 112px)) !important; inset-block-start:max(112px,calc(env(safe-area-inset-top) + 112px)) !important; bottom:max(10px,env(safe-area-inset-bottom)); inset-block-end:max(10px,env(safe-area-inset-bottom)); max-height:calc(100dvh - 122px); }
+  body .toast-stack, body .app-toast-viewport { top:120px !important; }
+}

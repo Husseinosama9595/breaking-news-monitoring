@@ -22,6 +22,7 @@ export class AppShellComponent {
   protected readonly sidebarCollapsed = signal(false);
   protected readonly pageTitle = signal('Overview');
   protected readonly pageSection = signal('COMMAND CENTER');
+  protected readonly globalSearchQuery = signal('');
 
   private readonly router = inject(Router);
   private readonly activatedRoute = inject(ActivatedRoute);
@@ -66,6 +67,18 @@ export class AppShellComponent {
 
   protected logout(): void {
     this.auth.logout();
+  }
+
+  protected updateGlobalSearch(event: Event): void {
+    this.globalSearchQuery.set((event.target as HTMLInputElement).value);
+  }
+
+  protected submitGlobalSearch(event: Event): void {
+    event.preventDefault();
+    const query = this.globalSearchQuery().trim();
+    if (!query) return;
+    void this.router.navigate(['/search'], { queryParams: { q: query } });
+    this.closeSidebar();
   }
 
   protected readonly countryFlag = countryFlag;

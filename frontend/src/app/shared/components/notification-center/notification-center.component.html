@@ -14,8 +14,8 @@
   @if (panelOpen()) {
     <section id="notification-center-panel" class="notification-panel" role="region" aria-label="Notification center">
       <header class="panel-header">
-        <div><strong>Notifications</strong><small>{{ connectionLabel() }}</small></div>
-        <button type="button" class="mark-all" [disabled]="liveNotifications.unreadCount() === 0 || liveNotifications.markAllPending()" (click)="liveNotifications.markAllRead()">Mark all read</button>
+        <div class="panel-title"><div><strong>Notifications</strong><span class="panel-unread">{{ liveNotifications.unreadCount() }} unread</span></div><small>{{ connectionLabel() }}</small></div>
+        <div class="panel-actions"><button type="button" class="mark-all" [disabled]="liveNotifications.unreadCount() === 0 || liveNotifications.markAllPending()" (click)="liveNotifications.markAllRead()">Mark all read</button><button type="button" class="close-panel" aria-label="Close notifications" title="Close notifications" (click)="closePanel()"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>
       </header>
       @if (liveNotifications.historyActionError()) { <p class="notification-action-error" role="alert">{{ liveNotifications.historyActionError() }}</p> }
       @if (liveNotifications.notifications().length === 0) {

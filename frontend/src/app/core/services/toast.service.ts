@@ -20,7 +20,7 @@ export interface ShowToastOptions {
 }
 
 const DEFAULT_DURATION: Record<ToastKind, number> = {
-  success: 4200, error: 6500, warning: 5500, info: 4500, loading: 0,
+  success: 5000, error: 7500, warning: 6500, info: 5500, loading: 0,
 };
 
 @Injectable({ providedIn: 'root' })

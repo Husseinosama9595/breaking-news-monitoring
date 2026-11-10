@@ -31,4 +31,15 @@ describe('ToastService', () => {
     service.clear();
     expect(service.toasts()).toEqual([]);
   });
+
+  it('keeps readable transient notices visible slightly longer by default', () => {
+    vi.useFakeTimers();
+    const service = TestBed.inject(ToastService);
+    const id = service.show({ kind: 'success', title: 'Account saved' });
+    vi.advanceTimersByTime(4999);
+    expect(service.isLeaving(id)).toBe(false);
+    vi.advanceTimersByTime(1);
+    expect(service.isLeaving(id)).toBe(true);
+    service.clear();
+  });
 });

@@ -21,6 +21,12 @@ export const routes: Routes = [
         data: { pageHeading: 'Overview', pageSection: 'COMMAND CENTER' },
       },
       {
+        path: 'search',
+        loadComponent: () => import('./features/search/global-search-page.component').then((module) => module.GlobalSearchPageComponent),
+        title: 'Search Results | Breaking News Monitor',
+        data: { pageHeading: 'Search Results', pageSection: 'GLOBAL SEARCH' },
+      },
+      {
         path: 'accounts',
         loadComponent: () => import('./features/accounts/accounts-page.component').then((module) => module.AccountsPageComponent),
         title: 'Monitored Accounts | Breaking News Monitor',

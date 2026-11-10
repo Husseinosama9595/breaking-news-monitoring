@@ -71,6 +71,8 @@ describe('NotificationCenterComponent', () => {
 
     bell.click();
     fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.panel-header')?.textContent).toContain('2 unread');
+    expect(fixture.nativeElement.querySelector('.close-panel')?.getAttribute('aria-label')).toBe('Close notifications');
     (fixture.nativeElement.querySelector('.notification-preferences summary') as HTMLElement).click();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.permission-status')?.textContent).toContain('Blocked by your browser');
@@ -110,6 +112,15 @@ describe('NotificationCenterComponent', () => {
     fixture.detectChanges();
     expect(service.markAllRead).toHaveBeenCalledOnce();
     expect(bell.getAttribute('aria-label')).toContain('0 unread');
+    (fixture.nativeElement.querySelector('.close-panel') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.notification-panel')).toBeNull();
+    bell.click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.notification-panel')).not.toBeNull();
+    bell.click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.notification-panel')).toBeNull();
   });
 
   it('shows a clear empty state when there is no notification history', async () => {

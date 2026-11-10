@@ -1,0 +1,49 @@
+<main class="global-search-page">
+  <header class="search-heading">
+    <div>
+      <div class="search-eyebrow">GLOBAL SEARCH</div>
+      <h2>Search results</h2>
+      @if (query()) { <p>Sources and collected posts matching <strong>“{{ query() }}”</strong>.</p> }
+      @else { <p>Search monitored sources and collected post content from the navbar.</p> }
+    </div>
+    @if (!loading() && !errorMessage() && query()) {
+      <div class="search-total"><strong>{{ accountTotal() + postTotal() }}</strong><span>matches</span></div>
+    }
+  </header>
+
+  @if (loading()) {
+    <section class="search-state" role="status"><span class="search-spinner" aria-hidden="true"></span><strong>Searching sources and posts</strong><p>Checking monitored accounts and collected posts.</p></section>
+  } @else if (errorMessage()) {
+    <section class="search-state search-error" role="alert"><span class="search-state-icon"><i class="bi bi-exclamation-circle"></i></span><strong>Search could not be completed</strong><p>{{ errorMessage() }}</p><button type="button" (click)="retry()">Retry search</button></section>
+  } @else if (!query()) {
+    <section class="search-state"><span class="search-state-icon"><i class="bi bi-search"></i></span><strong>Enter a search term</strong><p>Use the navbar search to find source usernames, display names, and post text.</p></section>
+  } @else if (accountTotal() === 0 && postTotal() === 0) {
+    <section class="search-state"><span class="search-state-icon"><i class="bi bi-inbox"></i></span><strong>No results found</strong><p>No monitored sources or collected posts matched “{{ query() }}”. Try a broader search term.</p></section>
+  } @else {
+    <div class="search-results-grid">
+      <section class="search-result-panel" aria-labelledby="source-results-title">
+        <header class="result-panel-heading"><div><span class="result-kicker">MONITORED SOURCES</span><h3 id="source-results-title">Accounts</h3></div><span class="result-count">{{ accountTotal() }}</span></header>
+        @if (accounts().length) {
+          <ul class="source-results">
+            @for (account of accounts(); track account._id) {
+              <li><span class="source-avatar">@</span><div class="source-result-copy"><strong>{{ account.displayName || '@' + account.username }}</strong><small>@{{ account.username }} · {{ account.category }}</small></div><a [href]="accountProfileUrl(account)" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'Open @' + account.username + ' on X'"><i class="bi bi-arrow-up-right" aria-hidden="true"></i></a></li>
+            }
+          </ul>
+          @if (accountTotal() > accounts().length) { <p class="result-limit-note">Showing the first {{ accounts().length }} accounts.</p> }
+        } @else { <p class="result-empty">No monitored accounts matched this term.</p> }
+      </section>
+
+      <section class="search-result-panel" aria-labelledby="post-results-title">
+        <header class="result-panel-heading"><div><span class="result-kicker">COLLECTED COVERAGE</span><h3 id="post-results-title">Posts</h3></div><span class="result-count">{{ postTotal() }}</span></header>
+        @if (posts().length) {
+          <div class="post-results">
+            @for (post of posts(); track post._id) {
+              <article class="post-result"><div class="post-result-meta"><strong>@{{ post.username || post.author?.username || 'unknown' }}</strong><span>{{ post.publishedAt ? (post.publishedAt | date:'MMM d, y · HH:mm') : 'Date unavailable' }}</span></div><p>{{ post.text || 'Post text unavailable.' }}</p><footer><span>{{ post.category || 'Other' }}</span><span class="delivery-state" [class.sent]="post.notificationStatus === 'sent'">{{ post.notificationStatus }}</span>@if (originalPostUrl(post); as url) { <a [href]="url" target="_blank" rel="noopener noreferrer">Open post <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a> }</footer></article>
+            }
+          </div>
+          @if (postTotal() > posts().length) { <p class="result-limit-note">Showing the 100 newest matching posts.</p> }
+        } @else { <p class="result-empty">No collected posts matched this term.</p> }
+      </section>
+    </div>
+  }
+</main>
