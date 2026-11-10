@@ -1,0 +1,60 @@
+<div class="posts-page">
+  <header class="page-heading">
+    <div><div class="eyebrow"><span></span> INCOMING COVERAGE</div><h2>Collected posts</h2><p>Review posts stored from your monitored public sources.</p></div>
+    <div class="heading-actions"><span class="result-count">{{ loaded() ? total() : '—' }} <small>posts</small></span><button class="refresh-button" type="button" [disabled]="loading()" (click)="loadPosts()">@if (loading()) { <span class="spinner" aria-hidden="true"></span> } @else { <i class="bi bi-arrow-clockwise"></i> } Refresh</button></div>
+  </header>
+
+  <form class="filter-bar" [formGroup]="filters" (ngSubmit)="applyFilters()">
+    <label class="filter-search"><i class="bi bi-search"></i><input formControlName="username" type="search" placeholder="Filter by username" aria-label="Filter by username"></label>
+    <label class="select-wrap"><span>Category</span><select formControlName="category" aria-label="Filter by category"><option value="">All categories</option>@for (category of categories; track category) { <option [value]="category">{{ category }}</option> }</select></label>
+    <label class="select-wrap"><span>Delivery</span><select formControlName="notificationStatus" aria-label="Filter by notification status"><option value="">All statuses</option>@for (status of statuses; track status) { <option [value]="status">{{ status | titlecase }}</option> }</select></label>
+    <button class="filter-submit" type="submit" [disabled]="loading()">Apply filters</button><button class="clear-filters" type="button" [disabled]="loading()" (click)="clearFilters()">Clear</button>
+  </form>
+
+  @if (loading()) {
+    <section class="feed-state" role="status"><span class="large-spinner" aria-hidden="true"></span><strong>Loading collected posts</strong><p>Fetching the current page from the backend.</p></section>
+  } @else if (errorMessage()) {
+    <section class="feed-state error-state" role="alert"><span class="state-icon"><i class="bi bi-exclamation-circle"></i></span><strong>Could not load posts</strong><p>{{ errorMessage() }}</p><button class="retry-button" type="button" (click)="loadPosts()">Try again <i class="bi bi-arrow-right"></i></button></section>
+  } @else if (posts().length === 0) {
+    <section class="feed-state"><span class="state-icon"><i class="bi bi-inbox"></i></span><strong>No posts found</strong><p>{{ total() === 0 ? 'The posts API returned no stored posts.' : 'Try changing or clearing the filters.' }}</p></section>
+  } @else {
+    <div class="feed-list">
+      @for (post of posts(); track post._id) {
+        <article class="post-card" [class.is-clickable]="!!originalPostUrl(post)">
+          <div class="post-marker" [class.critical]="post.priority === 'CRITICAL'" [class.high]="post.priority === 'HIGH'"></div>
+          <div class="post-content" [id]="'post-content-' + post._id">
+            <div class="post-head">
+              <div class="author-block">
+                @if (authorInitial(post); as initial) { <span class="author-avatar">{{ initial }}</span> }
+                @else { <span class="author-avatar author-avatar-empty"><i class="bi bi-person"></i></span> }
+                <div><strong>{{ authorName(post) }}</strong><small>{{ usernameLabel(post) }} <span>·</span> @if (hasValidTimestamp(post.publishedAt)) { {{ post.publishedAt | date:'MMM d, y · HH:mm' }} } @else { Publication date unavailable }</small></div>
+              </div>
+              <span class="priority" [class.critical]="post.priority === 'CRITICAL'" [class.high]="post.priority === 'HIGH'">{{ post.priority }}</span>
+            </div>
+            <p class="post-text">{{ previewText(post) }}</p>
+            @if (needsExpansion(post)) {
+              <button class="expand-content" type="button" [attr.aria-expanded]="isExpanded(post)" [attr.aria-controls]="'post-content-' + post._id" (click)="toggleExpanded(post, $event)">{{ isExpanded(post) ? 'Show less' : 'Read full post' }}</button>
+            }
+            <div class="post-footer">
+              <div class="post-tags">
+                @if (post.category) { <span class="category">{{ post.category }}</span> }
+                @if (post.providerName) { <span class="provider">{{ post.providerName }}</span> }
+                <span class="process-state">Processing {{ post.processingStatus }}</span>
+              </div>
+              <div class="delivery">
+                <span class="delivery-state" [class.sent]="post.notificationStatus === 'sent'" [class.failed]="post.notificationStatus === 'failed'"><i class="bi" [class.bi-check-circle-fill]="post.notificationStatus === 'sent'" [class.bi-clock]="post.notificationStatus !== 'sent' && post.notificationStatus !== 'failed'" [class.bi-exclamation-circle]="post.notificationStatus === 'failed'"></i> {{ post.notificationStatus }}</span>
+                @if (originalPostUrl(post); as originalUrl) {
+                  <a class="original-action" [href]="originalUrl" target="_blank" rel="noopener noreferrer">View original post <i class="bi bi-arrow-up-right"></i></a>
+                } @else { <span class="original-unavailable">Original link unavailable</span> }
+              </div>
+            </div>
+          </div>
+          @if (originalPostUrl(post); as originalUrl) {
+            <a class="post-card-hit-area" [href]="originalUrl" target="_blank" rel="noopener noreferrer" [attr.aria-label]="cardLinkLabel(post)"></a>
+          }
+        </article>
+      }
+    </div>
+    <nav class="pagination-bar" aria-label="Posts pagination"><span>Page {{ page() }} of {{ totalPages() }} · {{ total() }} posts</span><div><button type="button" [disabled]="page() <= 1 || loading()" (click)="changePage(page() - 1)"><i class="bi bi-chevron-left"></i> Previous</button><button type="button" [disabled]="page() >= totalPages() || loading()" (click)="changePage(page() + 1)">Next <i class="bi bi-chevron-right"></i></button></div></nav>
+  }
+</div>

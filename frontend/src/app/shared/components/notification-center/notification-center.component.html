@@ -1,0 +1,94 @@
+<div class="notification-center" (keydown.escape)="closePanel()">
+  <button
+    class="notification-bell"
+    type="button"
+    aria-haspopup="true"
+    [attr.aria-expanded]="panelOpen()"
+    aria-controls="notification-center-panel"
+    [attr.aria-label]="'Notifications, ' + liveNotifications.unreadCount() + ' unread'"
+    (click)="togglePanel()">
+    <i class="bi bi-bell" aria-hidden="true"></i>
+    @if (liveNotifications.unreadCount() > 0) { <span class="unread-count">{{ liveNotifications.unreadCount() > 99 ? '99+' : liveNotifications.unreadCount() }}</span> }
+  </button>
+
+  @if (panelOpen()) {
+    <section id="notification-center-panel" class="notification-panel" role="region" aria-label="Notification center">
+      <header class="panel-header">
+        <div><strong>Notifications</strong><small>{{ connectionLabel() }}</small></div>
+        <button type="button" class="mark-all" [disabled]="liveNotifications.unreadCount() === 0 || liveNotifications.markAllPending()" (click)="liveNotifications.markAllRead()">Mark all read</button>
+      </header>
+      @if (liveNotifications.historyActionError()) { <p class="notification-action-error" role="alert">{{ liveNotifications.historyActionError() }}</p> }
+      @if (liveNotifications.notifications().length === 0) {
+        <div class="panel-empty"><span class="empty-icon"><i class="bi bi-bell-slash"></i></span><strong>No notifications yet</strong><p>Newly collected posts will appear here while this session is open.</p></div>
+      } @else {
+        <ul class="notification-list">
+          @for (notification of liveNotifications.notifications(); track notification.postId) {
+            <li [class.unread]="!notification.read">
+              <span class="unread-dot" aria-hidden="true"></span>
+              <div class="notification-copy">
+                <strong>@{{ notification.username }}</strong>
+                @if (notification.category) { <span class="notification-category">{{ notification.category }}</span> }
+                <p>{{ notification.textPreview }}</p>
+                <time [attr.datetime]="notification.detectedAt">Detected {{ notification.detectedAt | date:'MMM d, y · HH:mm:ss' }}</time>
+                @if (notification.postUrl) { <a [href]="notification.postUrl" target="_blank" rel="noopener noreferrer" (click)="handleNotificationOpen(notification)">View original post <i class="bi bi-arrow-up-right"></i></a> }
+                @else { <span class="no-link">Original link unavailable</span> }
+              </div>
+              @if (!notification.read) { <button class="mark-one" type="button" [disabled]="liveNotifications.isReadPending(notification.notificationId)" [attr.aria-label]="'Mark post from @' + notification.username + ' as read'" (click)="markRead(notification)"><i class="bi bi-check2"></i></button> }
+            </li>
+          }
+        </ul>
+      }
+      <details class="notification-preferences">
+        <summary><i class="bi bi-sliders2" aria-hidden="true"></i> Notification preferences</summary>
+        <div class="preferences-content">
+          <label class="preference-row" for="sound-notifications-toggle">
+            <span><strong>Sound notifications</strong><small>Play a short, quiet tone for new posts.</small></span>
+            <input id="sound-notifications-toggle" type="checkbox" [checked]="liveNotifications.preferences().soundEnabled" (change)="handleSoundChange($event)" />
+          </label>
+          <label class="sound-control" for="notification-sound-type">
+            <span>Notification sound</span>
+            <select id="notification-sound-type" [value]="liveNotifications.preferences().soundType" (change)="handleSoundTypeChange($event)">
+              <option value="email">Email-style</option>
+              <option value="classic">Classic chime</option>
+              <option value="digital">Modern digital</option>
+              <option value="double-tone">Soft double-tone</option>
+            </select>
+          </label>
+          <label class="sound-control volume-control" for="notification-sound-volume">
+            <span>Volume <strong>{{ liveNotifications.preferences().soundVolume }}%</strong></span>
+            <input id="notification-sound-volume" type="range" min="0" max="100" step="1"
+              [value]="liveNotifications.preferences().soundVolume"
+              [attr.aria-valuetext]="liveNotifications.preferences().soundVolume + '%'"
+              (input)="handleSoundVolumeChange($event)" />
+            <small>0% is muted</small>
+          </label>
+          <div class="preference-action-row">
+            <button class="preview-sound" type="button" (click)="previewSound()"><i class="bi bi-volume-up" aria-hidden="true"></i> Preview sound</button>
+            <span class="preference-note" aria-live="polite">{{ previewMessage() || 'Audio starts after a user interaction.' }}</span>
+          </div>
+          <label class="preference-row" for="desktop-notifications-toggle">
+            <span><strong>Desktop notifications</strong><small>Show browser notices while the dashboard is open.</small></span>
+            <input id="desktop-notifications-toggle" type="checkbox" [checked]="liveNotifications.preferences().desktopNotificationsEnabled" [disabled]="liveNotifications.desktopPermission() === 'unsupported'" (change)="handleDesktopChange($event)" />
+          </label>
+          <p class="permission-status" [class.permission-denied]="liveNotifications.desktopPermission() === 'denied'" role="status">{{ desktopPermissionMessage() }}</p>
+        </div>
+      </details>
+    </section>
+  }
+
+  <div class="toast-stack" aria-live="polite" aria-relevant="additions" aria-atomic="false">
+    @for (notification of liveNotifications.toastNotifications(); track notification.postId) {
+      <article class="post-toast" role="status">
+        <span class="toast-mark" aria-hidden="true"><i class="bi bi-lightning-charge-fill"></i></span>
+        <div class="toast-copy">
+          <strong>New post detected</strong>
+          <span class="toast-source">@{{ notification.username }}</span>
+          <p>{{ notification.textPreview }}</p>
+          <time [attr.datetime]="notification.detectedAt">{{ notification.detectedAt | date:'MMM d · HH:mm:ss' }}</time>
+          @if (notification.postUrl) { <a [href]="notification.postUrl" target="_blank" rel="noopener noreferrer" (click)="handleNotificationOpen(notification)">View original <i class="bi bi-arrow-up-right"></i></a> }
+        </div>
+        <button class="toast-dismiss" type="button" [attr.aria-label]="'Dismiss notification from @' + notification.username" (click)="liveNotifications.dismissToast(notification.postId)"><i class="bi bi-x-lg"></i></button>
+      </article>
+    }
+  </div>
+</div>

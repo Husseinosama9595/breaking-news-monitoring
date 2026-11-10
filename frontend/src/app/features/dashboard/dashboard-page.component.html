@@ -1,0 +1,77 @@
+<div class="dashboard-page">
+  <header class="page-intro">
+    <div>
+      <div class="eyebrow"><span class="eyebrow-rule"></span> EDITORIAL MONITORING DESK</div>
+      <h2>Good morning, administrator.</h2>
+      <p class="intro-copy">A clear view of the sources and coverage your workspace has collected.</p>
+    </div>
+    <button class="dashboard-refresh" type="button" [disabled]="accountsLoading() || postsLoading()" (click)="refreshDashboard()">
+      @if (accountsLoading() || postsLoading()) { <span class="refresh-spinner" aria-hidden="true"></span> }
+      @else { <i class="bi bi-arrow-clockwise"></i> }
+      Refresh data
+    </button>
+  </header>
+
+  <section class="monitoring-banner" aria-label="Account API state">
+    <div class="signal-icon"><i class="bi bi-broadcast-pin"></i></div>
+    <div class="monitor-copy">
+      <div class="monitor-label">SOURCE CONNECTION</div>
+      @if (accountsLoading()) { <h3>Checking the account roster</h3><p>Requesting configured sources from the backend.</p> }
+      @else if (accountsError()) { <h3>Account data is unavailable</h3><p>{{ accountsError() }}</p> }
+      @else { <h3>Your account roster is available</h3><p>Counts reflect the account records returned by the backend.</p> }
+    </div>
+    <div class="monitor-badge" [class.connected]="accountsLoaded()" [class.unavailable]="!!accountsError()">
+      <span></span>{{ accountsLoading() ? 'CHECKING' : accountsError() ? 'UNAVAILABLE' : 'API CONNECTED' }}
+    </div>
+  </section>
+
+  <section class="kpi-grid" aria-label="Monitoring statistics">
+    <article class="kpi-item"><div class="kpi-heading"><span>MONITORED ACCOUNTS</span><i class="bi bi-broadcast"></i></div><div class="kpi-number">{{ accountsLoaded() ? totalAccounts() : '—' }}</div><div class="kpi-caption">{{ accountsLoaded() ? 'Accounts in the current roster' : accountsError() ? 'Account data unavailable' : 'Loading account data' }}</div></article>
+    <article class="kpi-item"><div class="kpi-heading"><span>ACTIVE SOURCES</span><i class="bi bi-activity"></i></div><div class="kpi-number">{{ accountsLoaded() ? activeAccounts() : '—' }}</div><div class="kpi-caption">{{ accountsLoaded() ? 'Enabled with active monitoring status' : accountsError() ? 'Account data unavailable' : 'Loading account data' }}</div></article>
+    <article class="kpi-item"><div class="kpi-heading"><span>DISABLED</span><i class="bi bi-pause-circle"></i></div><div class="kpi-number">{{ accountsLoaded() ? disabledAccounts() : '—' }}</div><div class="kpi-caption">{{ accountsLoaded() ? 'Accounts currently disabled' : accountsError() ? 'Account data unavailable' : 'Loading account data' }}</div></article>
+    <article class="kpi-item kpi-alerts"><div class="kpi-heading"><span>COLLECTED POSTS</span><i class="bi bi-newspaper"></i></div><div class="kpi-number">{{ postsLoaded() ? totalPosts() : '—' }}</div><div class="kpi-caption">{{ postsLoaded() ? 'Total matching stored posts' : postsError() ? 'Post data unavailable' : 'Loading post data' }}</div></article>
+  </section>
+
+  <div class="dashboard-grid">
+    <section class="content-panel live-panel">
+      <div class="panel-heading"><div><div class="panel-kicker">RECENT COVERAGE</div><h3>Collected posts</h3></div><a routerLink="/posts" class="panel-link">Explore feed <i class="bi bi-arrow-up-right"></i></a></div>
+      @if (postsLoading()) {
+        <div class="feed-state" role="status"><span class="loading-mark"></span><span>Loading posts from the backend…</span></div>
+      } @else if (postsError()) {
+        <div class="feed-state error-state" role="alert"><i class="bi bi-exclamation-circle"></i><span>{{ postsError() }}</span><button type="button" (click)="loadPosts()">Retry</button></div>
+      } @else if (posts().length === 0) {
+        <div class="feed-state empty-state"><span class="empty-mark"><i class="bi bi-inbox"></i></span><strong>No collected posts yet</strong><span>The posts API returned an empty feed.</span></div>
+      } @else {
+        @for (post of posts(); track post._id) {
+          <article class="feed-entry">
+            <div class="entry-rail"><span class="entry-dot" [class.critical]="post.priority === 'CRITICAL'"></span></div>
+            <div class="entry-body">
+            <div class="entry-meta"><div class="source-avatar">{{ (post.author?.displayName || post.username || '?').slice(0, 1).toUpperCase() }}</div><div class="source-copy"><strong>{{ post.author?.displayName || (post.username ? '@' + post.username : 'Unknown account') }}</strong><small>{{ post.username ? '@' + post.username : 'Username unavailable' }} <span>·</span> {{ hasValidPostTimestamp(post.publishedAt) ? (post.publishedAt | date:'MMM d, y · HH:mm') : 'Date unavailable' }}</small></div><span class="priority-tag" [class.high]="post.priority === 'HIGH'" [class.normal]="post.priority === 'NORMAL'"><i></i>{{ post.priority }}</span></div>
+              <p class="entry-text">{{ post.text || 'Post text unavailable.' }}</p>
+              <div class="entry-footer"><div class="entry-tags"><span class="category-tag">{{ post.category }}</span><span class="provider-tag">{{ post.providerName }}</span></div><span class="delivery-status" [class.sent]="post.notificationStatus === 'sent'" [class.failed]="post.notificationStatus === 'failed'"><i class="bi" [class.bi-check-circle-fill]="post.notificationStatus === 'sent'" [class.bi-clock]="post.notificationStatus !== 'sent' && post.notificationStatus !== 'failed'" [class.bi-exclamation-circle]="post.notificationStatus === 'failed'"></i>{{ post.notificationStatus }}</span></div>
+            </div>
+          </article>
+        }
+      }
+    </section>
+
+    <aside class="secondary-column">
+      <section class="content-panel accounts-panel">
+        <div class="panel-heading"><div><div class="panel-kicker">SOURCE ROSTER</div><h3>Monitored accounts</h3></div><a routerLink="/accounts" class="panel-link">View all <i class="bi bi-arrow-up-right"></i></a></div>
+        @if (accountsLoading()) { <div class="accounts-message"><span class="loading-mark"></span><span>Loading account roster…</span></div> }
+        @else if (accountsError()) { <div class="accounts-message error-state" role="alert"><i class="bi bi-exclamation-circle"></i><span>{{ accountsError() }}</span><button type="button" (click)="loadAccounts()">Retry</button></div> }
+        @else if (accounts().length === 0) { <div class="accounts-message"><i class="bi bi-inbox"></i><span>No monitored accounts found.</span></div> }
+        @else {
+          <div class="account-list">
+            @for (account of visibleAccounts(); track account._id) {
+              <article class="account-row"><div class="account-avatar"><i class="bi bi-at"></i></div><div class="account-main"><div class="account-heading"><strong>{{ account.displayName || '@' + account.username }}</strong><span class="enabled-state" [class.disabled]="!account.enabled"><i></i>{{ account.enabled ? 'Enabled' : 'Disabled' }}</span></div><div class="account-username">@{{ account.username }} <span>·</span> {{ account.category }}</div><div class="account-details"><span class="monitoring-state" [class.state-error]="account.monitoringStatus === 'error'" [class.state-paused]="account.monitoringStatus === 'paused'">{{ account.monitoringStatus }}</span><span class="provider-label">{{ account.providerName }}</span><span class="fetch-time">Fetched {{ hasValidTimestamp(account.lastSuccessfulFetchAt) ? (account.lastSuccessfulFetchAt | date:'MMM d, HH:mm') : 'never' }}</span></div><details class="account-health-details"><summary><span class="freshness-dot" [class.freshness-fresh]="feedFreshness(account) === 'fresh'" [class.freshness-stale]="feedFreshness(account) === 'stale'" [class.freshness-empty]="feedFreshness(account) === 'empty'" [class.freshness-unknown]="feedFreshness(account) === 'unknown'"></span>{{ freshnessLabel(account) }} <span>·</span> {{ pollStatusLabel(account) }}</summary><div class="account-health-expanded"><span>Entries {{ account.pollHealth?.returnedEntryCount ?? '—' }}</span><span>Inserted {{ account.pollHealth?.insertedPostCount ?? '—' }}</span><span>Duplicates {{ account.pollHealth?.duplicatePostCount ?? '—' }}</span><span>Duration {{ account.pollHealth?.lastDurationMs != null ? (account.pollHealth.lastDurationMs + ' ms') : '—' }}</span>@if (account.pollHealth?.lastErrorCode) { <span class="account-error-code">Code {{ account.pollHealth.lastErrorCode }}</span> }</div></details></div></article>
+            }
+          </div>
+          @if (remainingAccountCount() > 0) { <a routerLink="/accounts" class="more-accounts">View {{ remainingAccountCount() }} more sources <i class="bi bi-arrow-right"></i></a> }
+        }
+        <div class="panel-bottom-note"><span class="mini-state" [class.online]="accountsLoaded()"></span>{{ accountsError() ? 'ACCOUNT REQUEST FAILED' : accountsLoading() ? 'FETCHING ROSTER' : 'ACCOUNT DATA FROM API' }}</div>
+      </section>
+      <section class="delivery-note"><div class="delivery-icon"><i class="bi bi-shield-check"></i></div><div><strong>Delivery history</strong><p>Review the stored notification state alongside every collected post.</p><a routerLink="/posts">Open the post feed <i class="bi bi-arrow-right"></i></a></div></section>
+    </aside>
+  </div>
+</div>

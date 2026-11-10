@@ -1,0 +1,69 @@
+<section class="settings-page" aria-labelledby="settings-title">
+  <header class="page-heading">
+    <div>
+      <div class="eyebrow"><span></span>PREFERENCES</div>
+      <h2 id="settings-title">Settings</h2>
+      <p>Adjust notification behavior for this browser and review how the monitor works.</p>
+    </div>
+  </header>
+
+  <section class="settings-section" aria-labelledby="notification-settings-title">
+    <div class="section-heading">
+      <span class="section-icon"><i class="bi bi-bell" aria-hidden="true"></i></span>
+      <div><h3 id="notification-settings-title">Notification preferences</h3><p>These preferences are saved in this browser and do not change Telegram delivery.</p></div>
+    </div>
+
+    <div class="preference-list">
+      <label class="preference-row" for="settings-sound-toggle">
+        <span><strong>Sound notifications</strong><small>Play a short tone when a new post arrives in the live dashboard.</small></span>
+        <input id="settings-sound-toggle" type="checkbox" [checked]="liveNotifications.preferences().soundEnabled" (change)="handleSoundChange($event)" />
+      </label>
+      <label class="control-row" for="settings-sound-type">
+        <span><strong>Notification sound</strong><small>Choose the tone used for new posts and previews.</small></span>
+        <select id="settings-sound-type" [value]="liveNotifications.preferences().soundType" (change)="handleSoundTypeChange($event)">
+          <option value="email">Email-style</option>
+          <option value="classic">Classic chime</option>
+          <option value="digital">Modern digital</option>
+          <option value="double-tone">Soft double-tone</option>
+        </select>
+      </label>
+      <label class="control-row volume-row" for="settings-sound-volume">
+        <span><strong>Sound volume <em>{{ liveNotifications.preferences().soundVolume }}%</em></strong><small>Set to 0% to mute previews and notification sounds.</small></span>
+        <input id="settings-sound-volume" type="range" min="0" max="100" step="1" [value]="liveNotifications.preferences().soundVolume"
+          [attr.aria-valuetext]="liveNotifications.preferences().soundVolume + '%'" (input)="handleVolumeChange($event)" />
+      </label>
+      <div class="preview-row">
+        <button class="preview-button" type="button" (click)="previewSound()"><i class="bi bi-volume-up" aria-hidden="true"></i> Preview selected sound</button>
+        <span role="status" aria-live="polite">{{ previewMessage() || 'Audio requires a user interaction and may be blocked by browser settings.' }}</span>
+      </div>
+      <label class="preference-row" for="settings-desktop-toggle">
+        <span><strong>Desktop notifications</strong><small>Show browser notifications while the dashboard is open.</small></span>
+        <input id="settings-desktop-toggle" type="checkbox" [checked]="liveNotifications.preferences().desktopNotificationsEnabled"
+          [disabled]="liveNotifications.desktopPermission() === 'unsupported'" (change)="handleDesktopChange($event)" />
+      </label>
+      <p class="permission-status" [class.permission-denied]="liveNotifications.desktopPermission() === 'denied'" role="status">
+        <i class="bi" [class.bi-check-circle]="liveNotifications.desktopPermission() === 'granted'" [class.bi-info-circle]="liveNotifications.desktopPermission() !== 'granted'" aria-hidden="true"></i>
+        {{ permissionMessage() }}
+      </p>
+    </div>
+  </section>
+
+  <section class="settings-section application-section" aria-labelledby="application-info-title">
+    <div class="section-heading">
+      <span class="section-icon"><i class="bi bi-broadcast-pin" aria-hidden="true"></i></span>
+      <div><h3 id="application-info-title">About the monitor</h3><p>Current application behavior and where to find its data.</p></div>
+    </div>
+    <dl class="app-info">
+      <div><dt>Application</dt><dd>Breaking News Monitor</dd></div>
+      <div><dt>Feed collection</dt><dd>Backend polls configured providers; feed freshness and polling status appear with monitored accounts.</dd></div>
+      <div><dt>Post and delivery records</dt><dd>Collected posts and notification delivery states are stored by the backend.</dd></div>
+      <div><dt>Dashboard notifications</dt><dd>Notification history and read status are restored from the backend. Live browser alerts use authenticated SSE while this dashboard is connected.</dd></div>
+    </dl>
+    <nav class="section-links" aria-label="Application sections">
+      <a routerLink="/dashboard"><i class="bi bi-grid-1x2" aria-hidden="true"></i> Overview <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+      <a routerLink="/accounts"><i class="bi bi-broadcast" aria-hidden="true"></i> Monitored accounts <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+      <a routerLink="/posts"><i class="bi bi-lightning-charge" aria-hidden="true"></i> Collected posts <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+      <a routerLink="/notifications"><i class="bi bi-bell" aria-hidden="true"></i> Notification history <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+    </nav>
+  </section>
+</section>

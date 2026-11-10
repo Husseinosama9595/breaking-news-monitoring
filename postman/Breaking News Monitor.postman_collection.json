@@ -1,0 +1,497 @@
+{
+  "info": {
+    "_postman_id": "b57f804a-49a7-4faf-96de-362ee07949c1",
+    "name": "Breaking News Monitor — Phase 1 Backend",
+    "description": "Postman checks for the implemented Phase 1 Express API. Admin credentials are supplied through a local Postman environment; successful login stores its JWT in the jwtToken collection variable.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:3000",
+      "type": "string",
+      "description": "Backend origin. Change the current value if the API uses a different local port."
+    },
+    {
+      "key": "jwtToken",
+      "value": "",
+      "type": "string",
+      "description": "Set automatically by the successful Admin login request. Treat as a secret."
+    },
+    {
+      "key": "globalRateLimitCount",
+      "value": "0",
+      "type": "string",
+      "description": "Iteration counter for the optional 121-request global rate-limit check. Reset to 0 before running that folder."
+    }
+  ],
+  "item": [
+    {
+      "name": "Health and Readiness",
+      "item": [
+        {
+          "name": "Liveness",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/health/live" },
+            "description": "Checks that the Express process is responding."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Body reports liveness', function () { pm.expect(pm.response.json()).to.eql({ status: 'ok' }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Readiness — MongoDB state",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/health/ready" },
+            "description": "Checks the readiness response for either a connected or disconnected MongoDB state."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('MongoDB is the required dependency and response matches its state', function () {",
+                  "  pm.expect(body.services.mongodb.required).to.eql(true);",
+                  "  if (pm.response.code === 200) {",
+                  "    pm.expect(body.services.mongodb.ready).to.eql(true);",
+                  "    pm.expect(body.status).to.be.oneOf(['ready', 'degraded']);",
+                  "  } else {",
+                  "    pm.response.to.have.status(503);",
+                  "    pm.expect(body.services.mongodb.ready).to.eql(false);",
+                  "    pm.expect(body.status).to.eql('not_ready');",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Readiness — Redis state",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/health/ready" },
+            "description": "Checks Redis disabled, ready, or unavailable behavior. Redis is optional; when it is configured but unavailable and MongoDB is ready, the API reports degraded with HTTP 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const mongo = body.services.mongodb;",
+                  "const redis = body.services.redis;",
+                  "pm.test('Redis is reported as optional with boolean state fields', function () {",
+                  "  pm.expect(redis.required).to.eql(false);",
+                  "  pm.expect(redis.enabled).to.be.a('boolean');",
+                  "  pm.expect(redis.ready).to.be.a('boolean');",
+                  "});",
+                  "pm.test('Readiness reflects MongoDB and optional Redis correctly', function () {",
+                  "  if (!mongo.ready) {",
+                  "    pm.response.to.have.status(503);",
+                  "    pm.expect(body.status).to.eql('not_ready');",
+                  "  } else {",
+                  "    pm.response.to.have.status(200);",
+                  "    if (redis.enabled && !redis.ready) {",
+                  "      pm.expect(body.status).to.eql('degraded');",
+                  "    } else {",
+                  "      pm.expect(body.status).to.eql('ready');",
+                  "    }",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin Authentication",
+      "item": [
+        {
+          "name": "Admin login — valid credentials",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": {{adminUsernameJson}},\n  \"password\": {{adminPasswordJson}}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login" },
+            "description": "Requires adminUsername and adminPassword from a local Postman environment. On success, saves accessToken into the jwtToken collection variable."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('jwtToken');",
+                  "const username = pm.environment.get('adminUsername');",
+                  "const password = pm.environment.get('adminPassword');",
+                  "if (typeof username !== 'string' || username.length === 0 || typeof password !== 'string' || password.length === 0) {",
+                  "  throw new Error('Set adminUsername and adminPassword in the selected local Postman environment.');",
+                  "}",
+                  "pm.variables.set('adminUsernameJson', JSON.stringify(username));",
+                  "pm.variables.set('adminPasswordJson', JSON.stringify(password));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Valid admin login returns HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Login response has the documented token fields', function () {",
+                  "  pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.tokenType).to.eql('Bearer');",
+                  "  pm.expect(body.expiresIn).to.eql(28800);",
+                  "});",
+                  "if (pm.response.code === 200 && typeof body.accessToken === 'string' && body.accessToken.length > 0) {",
+                  "  pm.collectionVariables.set('jwtToken', body.accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin login — wrong password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": {{adminUsernameJson}},\n  \"password\": \"\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login" },
+            "description": "Uses the configured admin username with an empty (incorrect) password. Does not include or store the real password."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const username = pm.environment.get('adminUsername');",
+                  "if (typeof username !== 'string' || username.length === 0) throw new Error('Set adminUsername in the selected local Postman environment.');",
+                  "pm.variables.set('adminUsernameJson', JSON.stringify(username));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Wrong password is rejected with HTTP 401', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Login error response is correct', function () { pm.expect(pm.response.json()).to.eql({ error: 'Invalid username or password' }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin login — missing fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/api/auth/login" },
+            "description": "Verifies the login route rejects a body without username and password."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing login fields are rejected with HTTP 401', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Login error response is correct', function () { pm.expect(pm.response.json()).to.eql({ error: 'Invalid username or password' }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin login — empty username",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"\",\n  \"password\": \"\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login" },
+            "description": "Verifies provided-but-empty credentials are rejected without embedding any real credential."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Empty username is rejected with HTTP 401', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Login error response is correct', function () { pm.expect(pm.response.json()).to.eql({ error: 'Invalid username or password' }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin session — valid JWT",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwtToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/auth/session" },
+            "description": "Run after the successful Admin login request has populated jwtToken."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Valid JWT is accepted', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Session response confirms authentication', function () { pm.expect(pm.response.json()).to.eql({ authenticated: true }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin session — missing JWT",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/session" },
+            "description": "Sends no Authorization header."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing JWT is rejected with HTTP 401', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Missing-token error response is correct', function () { pm.expect(pm.response.json()).to.eql({ error: 'Authentication required' }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin session — invalid JWT",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer invalid-postman-token" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/auth/session" },
+            "description": "Uses a deliberately malformed dummy token; it is not a real credential."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid JWT is rejected with HTTP 401', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Invalid-token error response is correct', function () { pm.expect(pm.response.json()).to.eql({ error: 'Invalid or expired authentication token' }); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Login Rate Limit — run separately after restart",
+      "description": "The login route allows 10 requests per 15 minutes per client IP. Run this folder by itself after restarting the backend so the in-memory limiter starts at zero. Requests 01–10 should return 401; request 11 should return 429.",
+      "item": [
+        {
+          "name": "Login limit probe 01 of 11",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"\",\"password\":\"\"}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/api/auth/login" }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Attempt 01 is below the limit', function () { pm.response.to.have.status(401); });"] } }]
+        },
+        {
+          "name": "Login limit probe 02 of 11",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"\",\"password\":\"\"}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/api/auth/login" }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Attempt 02 is below the limit', function () { pm.response.to.have.status(401); });"] } }]
+        },
+        {
+          "name": "Login limit probe 03 of 11",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"\",\"password\":\"\"}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/api/auth/login" }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Attempt 03 is below the limit', function () { pm.response.to.have.status(401); });"] } }]
+        },
+        {
+          "name": "Login limit probe 04 of 11",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"\",\"password\":\"\"}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/api/auth/login" }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Attempt 04 is below the limit', function () { pm.response.to.have.status(401); });"] } }]
+        },
+        {
+          "name": "Login limit probe 05 of 11",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"\",\"password\":\"\"}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/api/auth/login" }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Attempt 05 is below the limit', function () { pm.response.to.have.status(401); });"] } }]
+        },
+        {
+          "name": "Login limit probe 06 of 11",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"\",\"password\":\"\"}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/api/auth/login" }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Attempt 06 is below the limit', function () { pm.response.to.have.status(401); });"] } }]
+        },
+        {
+          "name": "Login limit probe 07 of 11",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"\",\"password\":\"\"}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/api/auth/login" }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Attempt 07 is below the limit', function () { pm.response.to.have.status(401); });"] } }]
+        },
+        {
+          "name": "Login limit probe 08 of 11",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"\",\"password\":\"\"}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/api/auth/login" }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Attempt 08 is below the limit', function () { pm.response.to.have.status(401); });"] } }]
+        },
+        {
+          "name": "Login limit probe 09 of 11",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"\",\"password\":\"\"}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/api/auth/login" }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Attempt 09 is below the limit', function () { pm.response.to.have.status(401); });"] } }]
+        },
+        {
+          "name": "Login limit probe 10 of 11",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"\",\"password\":\"\"}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/api/auth/login" }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Attempt 10 is the last permitted attempt', function () { pm.response.to.have.status(401); });"] } }]
+        },
+        {
+          "name": "Login limit probe 11 of 11 — expect 429",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"\",\"password\":\"\"}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/api/auth/login" }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Attempt 11 is rate limited', function () { pm.response.to.have.status(429); });", "pm.test('Rate-limit response has the configured message', function () { pm.expect(pm.response.json()).to.eql({ error: 'Too many login attempts. Try again later.' }); });"] } }]
+        }
+      ]
+    },
+    {
+      "name": "Global Rate Limit — 121 iterations, run last",
+      "description": "The Express-wide limiter allows 120 requests per minute. Run this one-request folder with 121 Runner iterations, no delay, after restarting the backend. Reset globalRateLimitCount to 0 first. The first 120 responses should be 200; the final response should be 429. This temporarily rate-limits the Postman client IP across all API routes.",
+      "item": [
+        {
+          "name": "Global limit probe (configure Runner for 121 iterations)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/health/live" },
+            "description": "In Collection Runner, run this folder for 121 iterations with no delay. Restart the backend first, and reset the globalRateLimitCount collection variable to 0."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const attempt = Number(pm.collectionVariables.get('globalRateLimitCount') || '0') + 1;",
+                  "pm.collectionVariables.set('globalRateLimitCount', String(attempt));",
+                  "if (attempt <= 120) {",
+                  "  pm.test('Global request ' + attempt + ' is below the limit', function () { pm.response.to.have.status(200); });",
+                  "} else {",
+                  "  pm.test('Global request 121 is rate limited', function () { pm.response.to.have.status(429); });",
+                  "  pm.test('Global limiter uses the configured default response', function () { pm.expect(pm.response.text()).to.eql('Too many requests, please try again later.'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+/* You can add global styles to this file, and also import other style files */
+
+:root {
+  color-scheme: light;
+  --app-ink: #242b2c;
+  --app-muted: #737c7a;
+  --app-surface: #fffefa;
+  --app-background: #f5f4ef;
+  --app-border: #e7e5dd;
+  --app-accent: #c94d4a;
+  --app-accent-soft: #f8e9e6;
+  --app-green: #3d7660;
+  --app-amber: #a9702e;
+  --app-blue: #547a91;
+  --app-radius-sm: 9px;
+  --app-radius-md: 15px;
+  --app-radius-lg: 22px;
+  --app-shadow-soft: 0 10px 30px #26332b0a;
+  --app-shadow-card: 0 2px 8px #26332b08, 0 14px 34px #26332b07;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--app-background);
+  color: var(--app-ink);
+  font-family: Inter, 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+.brand-heading {
+  font-family: Inter, 'Segoe UI', sans-serif;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection { background: #f2d2cc; color: #382f2e; }
+:focus-visible { outline: 3px solid #ce665c66; outline-offset: 2px; }

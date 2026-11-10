@@ -1,0 +1,82 @@
+<section class="history-page" aria-labelledby="history-title">
+  <header class="page-heading">
+    <div>
+      <div class="eyebrow"><span></span>DELIVERY</div>
+      <h2 id="history-title">Notification history</h2>
+      <p>Saved notifications from eligible posts detected by the monitor.</p>
+    </div>
+    <button class="mark-all-button" type="button" [disabled]="liveNotifications.unreadCount() === 0 || liveNotifications.markAllPending()" (click)="markAllRead()">
+      <i class="bi bi-check2-all" aria-hidden="true"></i> Mark all as read
+    </button>
+  </header>
+
+  <aside class="history-notice" role="note">
+    <i class="bi bi-info-circle" aria-hidden="true"></i>
+    <span>Notification history and read status are saved by the backend. Live browser alerts still require this dashboard to be open and connected.</span>
+  </aside>
+
+  @if (liveNotifications.historyActionError()) { <div class="history-error" role="alert">{{ liveNotifications.historyActionError() }}</div> }
+
+  @if (liveNotifications.historyError()) {
+    <div class="history-error" role="alert"><span>{{ liveNotifications.historyError() }}</span><button type="button" (click)="retry()">Retry</button></div>
+  }
+
+  <section class="history-panel" aria-label="Saved notifications">
+    @if (liveNotifications.notifications().length > 0) {
+      <div class="history-toolbar">
+        <span><strong>{{ liveNotifications.notifications().length }}</strong> saved notifications</span>
+        <span class="unread-summary">{{ liveNotifications.unreadCount() }} unread</span>
+      </div>
+      <ol class="notification-list">
+        @for (notification of liveNotifications.notifications(); track notification.postId) {
+          <li class="notification-item" [class.is-unread]="!notification.read">
+            <span class="timeline-marker" aria-hidden="true"><i class="bi" [class.bi-lightning-charge-fill]="!notification.read" [class.bi-check2]="notification.read"></i></span>
+            <article class="notification-content">
+              <div class="notification-topline">
+                <div class="source-line">
+                  <strong>@{{ notification.username }}</strong>
+                  @if (notification.displayName) { <span>{{ notification.displayName }}</span> }
+                  @if (notification.category) { <span class="category-pill">{{ notification.category }}</span> }
+                </div>
+                <span class="read-state" [class.unread-state]="!notification.read">{{ notification.read ? 'Read' : 'Unread' }}</span>
+              </div>
+              <p class="post-text">{{ notification.textPreview }}</p>
+              <div class="notification-meta">
+                @if (notification.publishedAt) {
+                  <span><i class="bi bi-clock" aria-hidden="true"></i> Published {{ notification.publishedAt | date:'MMM d, y · HH:mm:ss' }}</span>
+                }
+                <span><i class="bi bi-inbox" aria-hidden="true"></i> Received {{ notification.detectedAt | date:'MMM d, y · HH:mm:ss' }}</span>
+              </div>
+              <footer class="notification-actions">
+                @if (safeOriginalPostUrl(notification.postUrl); as originalUrl) {
+                  <a [href]="originalUrl" target="_blank" rel="noopener noreferrer">Open original post <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+                } @else {
+                  <span class="link-unavailable">Original link unavailable</span>
+                }
+                @if (!notification.read) {
+                  <button type="button" class="mark-read-button" [disabled]="liveNotifications.isReadPending(notification.notificationId)" [attr.aria-label]="'Mark notification from @' + notification.username + ' as read'" (click)="markRead(notification)">
+                    <i class="bi bi-check2" aria-hidden="true"></i> Mark as read
+                  </button>
+                }
+              </footer>
+            </article>
+          </li>
+        }
+      </ol>
+    } @else if (liveNotifications.historyLoading() || liveNotifications.connectionState() === 'connecting') {
+      <div class="history-state" role="status"><span class="spinner" aria-hidden="true"></span><strong>Loading notification history</strong><p>Restoring saved notifications and connecting live updates.</p></div>
+    } @else {
+      <div class="history-state">
+        <span class="empty-icon"><i class="bi bi-bell-slash" aria-hidden="true"></i></span>
+        <strong>No notifications yet</strong>
+        <p>Notifications will appear here after the backend records eligible new posts.</p>
+        @if (liveNotifications.connectionState() === 'disconnected') { <span class="connection-note"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Live updates are reconnecting or unavailable.</span> }
+      </div>
+    }
+    @if (liveNotifications.historyHasMore() && liveNotifications.notifications().length > 0) {
+      <div class="load-older-row"><button type="button" [disabled]="liveNotifications.historyLoading()" (click)="loadOlder()">
+        @if (liveNotifications.historyLoading()) { <span class="spinner small" aria-hidden="true"></span> Loading… } @else { Load older notifications }
+      </button><span>{{ liveNotifications.notifications().length }} of {{ liveNotifications.historyTotal() }}</span></div>
+    }
+  </section>
+</section>

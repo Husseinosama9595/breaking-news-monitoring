@@ -1,0 +1,2341 @@
+{
+  "info": {
+    "_postman_id": "7c2c3bd8-5eb2-47ab-8a48-9cd2afc8f763",
+    "name": "Breaking News Monitor — Phase 2 Account Management",
+    "description": "Admin-authenticated Postman checks for the implemented Monitored Accounts API. Credentials come from a local Postman environment; the successful login stores its JWT in the jwtToken collection variable. Create requests use unique synthetic usernames and save only their new account IDs.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:3000",
+      "type": "string",
+      "description": "Local backend origin."
+    },
+    {
+      "key": "jwtToken",
+      "value": "",
+      "type": "string",
+      "description": "Saved automatically after successful login. Treat as a secret and clear after testing."
+    },
+    {
+      "key": "testUsername",
+      "value": "",
+      "type": "string",
+      "description": "Unique generated Nitter test username; updated after the rename request."
+    },
+    {
+      "key": "testAccountId",
+      "value": "",
+      "type": "string",
+      "description": "MongoDB ID saved from successful Nitter test account creation."
+    },
+    {
+      "key": "testMockUsername",
+      "value": "",
+      "type": "string",
+      "description": "Unique generated Mock test username."
+    },
+    {
+      "key": "testMockAccountId",
+      "value": "",
+      "type": "string",
+      "description": "MongoDB ID saved from successful Mock test account creation."
+    },
+    {
+      "key": "testRenamedUsername",
+      "value": "",
+      "type": "string",
+      "description": "Unique target username generated for the rename test."
+    }
+  ],
+  "item": [
+    {
+      "name": "A. Authentication",
+      "item": [
+        {
+          "name": "Admin login — valid credentials",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login"
+            },
+            "description": "Reads adminUsername and adminPassword from the selected local Postman environment. On success, saves accessToken in the jwtToken collection variable.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": {{adminUsernameJson}},\n  \"password\": {{adminPasswordJson}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('jwtToken');",
+                  "const username = pm.environment.get('adminUsername');",
+                  "const password = pm.environment.get('adminPassword');",
+                  "if (typeof username !== 'string' || !username || typeof password !== 'string' || !password) {",
+                  "  throw new Error('Set adminUsername and adminPassword in the selected local Postman environment.');",
+                  "}",
+                  "pm.variables.set('adminUsernameJson', JSON.stringify(username));",
+                  "pm.variables.set('adminPasswordJson', JSON.stringify(password));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Login returns the implemented token contract', function () {",
+                  "  pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.tokenType).to.eql('Bearer');",
+                  "  pm.expect(body.expiresIn).to.eql(28800);",
+                  "});",
+                  "if (pm.response.code === 200 && pm.response.json().accessToken) pm.collectionVariables.set('jwtToken', pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin session — valid JWT",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/session"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test('Session confirms authentication', function () { pm.expect(pm.response.json()).to.eql({ authenticated: true }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin session — missing JWT",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/session"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Error response matches the implementation\", function () { pm.expect(pm.response.json()).to.eql({ error: \"Authentication required\" }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin session — invalid JWT",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/session"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.request.headers.add({ key: 'Authorization', value: 'Bearer invalid-token' });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Error response matches the implementation\", function () { pm.expect(pm.response.json()).to.eql({ error: \"Invalid or expired authentication token\" }); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B. List accounts",
+      "item": [
+        {
+          "name": "GET all monitored accounts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Returns an accounts array of public account DTOs', function () {",
+                  "  pm.expect(body).to.have.property('accounts').that.is.an('array');",
+                  "  body.accounts.forEach(function (account) {",
+                  "    pm.expect(account._id).to.match(/^[a-f0-9]{24}$/i);",
+                  "    pm.expect(account.platform).to.eql('x');",
+                  "    pm.expect(account.username).to.be.a('string');",
+                  "    pm.expect(account.category).to.be.a('string');",
+                  "    pm.expect(account.enabled).to.be.a('boolean');",
+                  "    pm.expect(account.providerName).to.be.a('string');",
+                  "    pm.expect(account.monitoringStatus).to.be.oneOf(['active', 'paused', 'error']);",
+                  "    pm.expect(account.notificationBaselineAt).to.be.undefined;",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET all accounts without authentication",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Error response matches the implementation\", function () { pm.expect(pm.response.json()).to.eql({ error: \"Authentication required\" }); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "C. Create accounts",
+      "description": "Creates Nitter and Mock synthetic accounts, saves their IDs, then pauses both accounts. Run the create request and its following pause request in order.",
+      "item": [
+        {
+          "name": "Create Nitter test account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts"
+            },
+            "description": "Creates a uniquely named synthetic test account. The API creates it enabled and active. Run the next request immediately to pause it; first-poll baseline establishment remains controlled by the existing poller.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{testUsername}}\",\n  \"displayName\": \"BNM Postman Nitter Test\",\n  \"category\": \"Other\",\n  \"providerName\": \"nitter\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('testAccountId');",
+                  "const stamp = Date.now().toString(36).slice(-7);",
+                  "const random = Math.random().toString(36).slice(2, 7).padEnd(5, '0');",
+                  "pm.collectionVariables.set('testUsername', ('bnm' + stamp + random).slice(0, 15));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });\nconst body = pm.response.json();\npm.test('Returns the created account DTO', function () {\n  pm.expect(body).to.have.property('account').that.is.an('object');\n  pm.expect(body.account._id).to.match(/^[a-f0-9]{24}$/i);\n  pm.expect(body.account.providerName).to.eql(\"nitter\");\n  pm.expect(body.account.platform).to.eql('x');\n  pm.expect(body.account.enabled).to.eql(true);\n  pm.expect(body.account.monitoringStatus).to.eql('active');\n  pm.expect(body.account.notificationBaselineAt).to.be.undefined;\n});",
+                  "if (pm.response.code === 201 && pm.response.json().account && pm.response.json().account._id) {\n  pm.collectionVariables.set(\"testAccountId\", pm.response.json().account._id);\n  pm.collectionVariables.set(\"testUsername\", pm.response.json().account.username);\n}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pause Nitter test account immediately",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testAccountId}}/disable"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\",\"testAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "p",
+                  "m",
+                  ".",
+                  "t",
+                  "e",
+                  "s",
+                  "t",
+                  "(",
+                  "\"",
+                  "H",
+                  "T",
+                  "T",
+                  "P",
+                  " ",
+                  "2",
+                  "0",
+                  "0",
+                  "\"",
+                  ",",
+                  " ",
+                  "f",
+                  "u",
+                  "n",
+                  "c",
+                  "t",
+                  "i",
+                  "o",
+                  "n",
+                  " ",
+                  "(",
+                  ")",
+                  " ",
+                  "{",
+                  " ",
+                  "p",
+                  "m",
+                  ".",
+                  "r",
+                  "e",
+                  "s",
+                  "p",
+                  "o",
+                  "n",
+                  "s",
+                  "e",
+                  ".",
+                  "t",
+                  "o",
+                  ".",
+                  "h",
+                  "a",
+                  "v",
+                  "e",
+                  ".",
+                  "s",
+                  "t",
+                  "a",
+                  "t",
+                  "u",
+                  "s",
+                  "(",
+                  "2",
+                  "0",
+                  "0",
+                  ")",
+                  ";",
+                  " ",
+                  "}",
+                  ")",
+                  ";",
+                  "const account = pm.response.json().account;",
+                  "pm.test('Test account is paused after the safety step', function () {",
+                  "  pm.expect(account._id).to.eql(pm.collectionVariables.get(\"testAccountId\"));",
+                  "  pm.expect(account.enabled).to.eql(false);",
+                  "  pm.expect(account.monitoringStatus).to.eql('paused');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Mock test account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts"
+            },
+            "description": "Creates a uniquely named Mock account; no predefined fixture is selected for the generated handle.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{testMockUsername}}\",\n  \"displayName\": \"BNM Postman Mock Test\",\n  \"category\": \"Other\",\n  \"providerName\": \"mock\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('testMockAccountId');",
+                  "const stamp = Date.now().toString(36).slice(-7);",
+                  "const random = Math.random().toString(36).slice(2, 7).padEnd(5, '0');",
+                  "pm.collectionVariables.set('testMockUsername', ('bmm' + stamp + random).slice(0, 15));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });\nconst body = pm.response.json();\npm.test('Returns the created account DTO', function () {\n  pm.expect(body).to.have.property('account').that.is.an('object');\n  pm.expect(body.account._id).to.match(/^[a-f0-9]{24}$/i);\n  pm.expect(body.account.providerName).to.eql(\"mock\");\n  pm.expect(body.account.platform).to.eql('x');\n  pm.expect(body.account.enabled).to.eql(true);\n  pm.expect(body.account.monitoringStatus).to.eql('active');\n  pm.expect(body.account.notificationBaselineAt).to.be.undefined;\n});",
+                  "if (pm.response.code === 201 && pm.response.json().account && pm.response.json().account._id) {\n  pm.collectionVariables.set(\"testMockAccountId\", pm.response.json().account._id);\n  pm.collectionVariables.set(\"testMockUsername\", pm.response.json().account.username);\n}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pause Mock test account after creation",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testMockAccountId}}/disable"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\",\"testMockAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "p",
+                  "m",
+                  ".",
+                  "t",
+                  "e",
+                  "s",
+                  "t",
+                  "(",
+                  "\"",
+                  "H",
+                  "T",
+                  "T",
+                  "P",
+                  " ",
+                  "2",
+                  "0",
+                  "0",
+                  "\"",
+                  ",",
+                  " ",
+                  "f",
+                  "u",
+                  "n",
+                  "c",
+                  "t",
+                  "i",
+                  "o",
+                  "n",
+                  " ",
+                  "(",
+                  ")",
+                  " ",
+                  "{",
+                  " ",
+                  "p",
+                  "m",
+                  ".",
+                  "r",
+                  "e",
+                  "s",
+                  "p",
+                  "o",
+                  "n",
+                  "s",
+                  "e",
+                  ".",
+                  "t",
+                  "o",
+                  ".",
+                  "h",
+                  "a",
+                  "v",
+                  "e",
+                  ".",
+                  "s",
+                  "t",
+                  "a",
+                  "t",
+                  "u",
+                  "s",
+                  "(",
+                  "2",
+                  "0",
+                  "0",
+                  ")",
+                  ";",
+                  " ",
+                  "}",
+                  ")",
+                  ";",
+                  "const account = pm.response.json().account;",
+                  "pm.test('Test account is paused after the safety step', function () {",
+                  "  pm.expect(account._id).to.eql(pm.collectionVariables.get(\"testMockAccountId\"));",
+                  "  pm.expect(account.enabled).to.eql(false);",
+                  "  pm.expect(account.monitoringStatus).to.eql('paused');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create duplicate account — expect conflict",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts"
+            },
+            "description": "Requires the Nitter test account created earlier in this folder.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{testUsername}}\",\n  \"category\": \"Other\",\n  \"providerName\": \"nitter\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\",\"testAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"Error response matches the implementation\", function () { pm.expect(pm.response.json()).to.eql({ error: \"An account with this X username already exists\" }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create account with missing required username",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts"
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error response matches the implementation\", function () { pm.expect(pm.response.json()).to.eql({ error: \"username must be a string\" }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create account with invalid provider",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts"
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"bnmprovidercheck\",\n  \"providerName\": \"rsshub\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test('Unsupported provider is rejected', function () { pm.expect(pm.response.json().error).to.eql('providerName must be one of: mock, nitter'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create account without authentication",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts"
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{testUsername}}\",\n  \"providerName\": \"nitter\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Error response matches the implementation\", function () { pm.expect(pm.response.json()).to.eql({ error: \"Authentication required\" }); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "D. Retrieve account",
+      "description": "The created-account lookup requires the Nitter create request to have saved testAccountId.",
+      "item": [
+        {
+          "name": "Get created Nitter account by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testAccountId}}"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\",\"testAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Returns account DTO without internal tracking fields', function () {",
+                  "  pm.expect(body).to.have.property('account').that.is.an('object');",
+                  "  pm.expect(body.account._id).to.eql(pm.collectionVariables.get('testAccountId'));",
+                  "  pm.expect(body.account.notificationBaselineAt).to.be.undefined;",
+                  "  pm.expect(body.account.lastSeenProviderPostId).to.be.undefined;",
+                  "  pm.expect(body.account.notificationStatus).to.be.undefined;",
+                  "});",
+                  "pm.test('Returns the created Nitter test account', function () { pm.expect(body.account.providerName).to.eql('nitter'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get account with invalid MongoDB ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/not-a-valid-object-id"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error response matches the implementation\", function () { pm.expect(pm.response.json()).to.eql({ error: \"id must be a valid MongoDB ObjectId\" }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get nonexistent account ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/ffffffffffffffffffffffff"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () { pm.response.to.have.status(404); });",
+                  "pm.test(\"Error response matches the implementation\", function () { pm.expect(pm.response.json()).to.eql({ error: \"Monitored account not found\" }); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "E. Update account",
+      "description": "Update and rename requests target only testAccountId. Duplicate rename requires the Mock account created in folder C.",
+      "item": [
+        {
+          "name": "Update display name",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testAccountId}}"
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"BNM Postman Updated\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\",\"testAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test('Updates display name and leaves baseline/internal state out of response', function () {",
+                  "  const account = pm.response.json().account;",
+                  "  pm.expect(account.displayName).to.eql('BNM Postman Updated');",
+                  "  pm.expect(account.notificationBaselineAt).to.be.undefined;",
+                  "  pm.expect(account.notificationStatus).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update category",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testAccountId}}"
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"World News\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\",\"testAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test('Updates category', function () { pm.expect(pm.response.json().account.category).to.eql('World News'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attempt duplicate username rename — expect conflict",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testAccountId}}"
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{testMockUsername}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "f",
+                  "o",
+                  "r",
+                  " ",
+                  "(",
+                  "c",
+                  "o",
+                  "n",
+                  "s",
+                  "t",
+                  " ",
+                  "n",
+                  "a",
+                  "m",
+                  "e",
+                  " ",
+                  "o",
+                  "f",
+                  " ",
+                  "[",
+                  "\"",
+                  "j",
+                  "w",
+                  "t",
+                  "T",
+                  "o",
+                  "k",
+                  "e",
+                  "n",
+                  "\"",
+                  ",",
+                  "\"",
+                  "t",
+                  "e",
+                  "s",
+                  "t",
+                  "A",
+                  "c",
+                  "c",
+                  "o",
+                  "u",
+                  "n",
+                  "t",
+                  "I",
+                  "d",
+                  "\"",
+                  "]",
+                  ")",
+                  " ",
+                  "{",
+                  "\n",
+                  " ",
+                  " ",
+                  "i",
+                  "f",
+                  " ",
+                  "(",
+                  "!",
+                  "p",
+                  "m",
+                  ".",
+                  "c",
+                  "o",
+                  "l",
+                  "l",
+                  "e",
+                  "c",
+                  "t",
+                  "i",
+                  "o",
+                  "n",
+                  "V",
+                  "a",
+                  "r",
+                  "i",
+                  "a",
+                  "b",
+                  "l",
+                  "e",
+                  "s",
+                  ".",
+                  "g",
+                  "e",
+                  "t",
+                  "(",
+                  "n",
+                  "a",
+                  "m",
+                  "e",
+                  ")",
+                  ")",
+                  " ",
+                  "t",
+                  "h",
+                  "r",
+                  "o",
+                  "w",
+                  " ",
+                  "n",
+                  "e",
+                  "w",
+                  " ",
+                  "E",
+                  "r",
+                  "r",
+                  "o",
+                  "r",
+                  "(",
+                  "'",
+                  "R",
+                  "u",
+                  "n",
+                  " ",
+                  "t",
+                  "h",
+                  "e",
+                  " ",
+                  "m",
+                  "a",
+                  "t",
+                  "c",
+                  "h",
+                  "i",
+                  "n",
+                  "g",
+                  " ",
+                  "c",
+                  "r",
+                  "e",
+                  "a",
+                  "t",
+                  "e",
+                  " ",
+                  "r",
+                  "e",
+                  "q",
+                  "u",
+                  "e",
+                  "s",
+                  "t",
+                  " ",
+                  "f",
+                  "i",
+                  "r",
+                  "s",
+                  "t",
+                  ";",
+                  " ",
+                  "m",
+                  "i",
+                  "s",
+                  "s",
+                  "i",
+                  "n",
+                  "g",
+                  " ",
+                  "c",
+                  "o",
+                  "l",
+                  "l",
+                  "e",
+                  "c",
+                  "t",
+                  "i",
+                  "o",
+                  "n",
+                  " ",
+                  "v",
+                  "a",
+                  "r",
+                  "i",
+                  "a",
+                  "b",
+                  "l",
+                  "e",
+                  ":",
+                  " ",
+                  "'",
+                  " ",
+                  "+",
+                  " ",
+                  "n",
+                  "a",
+                  "m",
+                  "e",
+                  ")",
+                  ";",
+                  "\n",
+                  "}",
+                  "if (!pm.collectionVariables.get('testMockUsername')) throw new Error('Run Create Mock test account first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"Error response matches the implementation\", function () { pm.expect(pm.response.json()).to.eql({ error: \"An account with this X username already exists\" }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rename Nitter test account",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testAccountId}}"
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{testRenamedUsername}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "f",
+                  "o",
+                  "r",
+                  " ",
+                  "(",
+                  "c",
+                  "o",
+                  "n",
+                  "s",
+                  "t",
+                  " ",
+                  "n",
+                  "a",
+                  "m",
+                  "e",
+                  " ",
+                  "o",
+                  "f",
+                  " ",
+                  "[",
+                  "\"",
+                  "j",
+                  "w",
+                  "t",
+                  "T",
+                  "o",
+                  "k",
+                  "e",
+                  "n",
+                  "\"",
+                  ",",
+                  "\"",
+                  "t",
+                  "e",
+                  "s",
+                  "t",
+                  "A",
+                  "c",
+                  "c",
+                  "o",
+                  "u",
+                  "n",
+                  "t",
+                  "I",
+                  "d",
+                  "\"",
+                  "]",
+                  ")",
+                  " ",
+                  "{",
+                  "\n",
+                  " ",
+                  " ",
+                  "i",
+                  "f",
+                  " ",
+                  "(",
+                  "!",
+                  "p",
+                  "m",
+                  ".",
+                  "c",
+                  "o",
+                  "l",
+                  "l",
+                  "e",
+                  "c",
+                  "t",
+                  "i",
+                  "o",
+                  "n",
+                  "V",
+                  "a",
+                  "r",
+                  "i",
+                  "a",
+                  "b",
+                  "l",
+                  "e",
+                  "s",
+                  ".",
+                  "g",
+                  "e",
+                  "t",
+                  "(",
+                  "n",
+                  "a",
+                  "m",
+                  "e",
+                  ")",
+                  ")",
+                  " ",
+                  "t",
+                  "h",
+                  "r",
+                  "o",
+                  "w",
+                  " ",
+                  "n",
+                  "e",
+                  "w",
+                  " ",
+                  "E",
+                  "r",
+                  "r",
+                  "o",
+                  "r",
+                  "(",
+                  "'",
+                  "R",
+                  "u",
+                  "n",
+                  " ",
+                  "t",
+                  "h",
+                  "e",
+                  " ",
+                  "m",
+                  "a",
+                  "t",
+                  "c",
+                  "h",
+                  "i",
+                  "n",
+                  "g",
+                  " ",
+                  "c",
+                  "r",
+                  "e",
+                  "a",
+                  "t",
+                  "e",
+                  " ",
+                  "r",
+                  "e",
+                  "q",
+                  "u",
+                  "e",
+                  "s",
+                  "t",
+                  " ",
+                  "f",
+                  "i",
+                  "r",
+                  "s",
+                  "t",
+                  ";",
+                  " ",
+                  "m",
+                  "i",
+                  "s",
+                  "s",
+                  "i",
+                  "n",
+                  "g",
+                  " ",
+                  "c",
+                  "o",
+                  "l",
+                  "l",
+                  "e",
+                  "c",
+                  "t",
+                  "i",
+                  "o",
+                  "n",
+                  " ",
+                  "v",
+                  "a",
+                  "r",
+                  "i",
+                  "a",
+                  "b",
+                  "l",
+                  "e",
+                  ":",
+                  " ",
+                  "'",
+                  " ",
+                  "+",
+                  " ",
+                  "n",
+                  "a",
+                  "m",
+                  "e",
+                  ")",
+                  ";",
+                  "\n",
+                  "}",
+                  "const stamp = Date.now().toString(36).slice(-7);",
+                  "const random = Math.random().toString(36).slice(2, 7).padEnd(5, '0');",
+                  "pm.collectionVariables.set('testRenamedUsername', ('bnr' + stamp + random).slice(0, 15));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const account = pm.response.json().account;",
+                  "pm.test('Renames account without changing its ID or provider', function () {",
+                  "  pm.expect(account._id).to.eql(pm.collectionVariables.get('testAccountId'));",
+                  "  pm.expect(account.username).to.eql(pm.collectionVariables.get('testRenamedUsername'));",
+                  "  pm.expect(account.providerName).to.eql('nitter');",
+                  "  pm.expect(account.notificationBaselineAt).to.be.undefined;",
+                  "});",
+                  "if (pm.response.code === 200) pm.collectionVariables.set('testUsername', pm.response.json().account.username);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attempt internal baseline or processing-state modification",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testAccountId}}"
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationBaselineAt\": \"2026-01-01T00:00:00.000Z\",\n  \"notificationStatus\": \"sent\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\",\"testAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error response matches the implementation\", function () { pm.expect(pm.response.json()).to.eql({ error: \"Unsupported field(s): notificationBaselineAt, notificationStatus\" }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update with invalid category",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testAccountId}}"
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"Not A Category\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\",\"testAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test('Invalid category returns the schema options', function () { pm.expect(pm.response.json().error).to.eql('category must be one of: World News, Politics, Military & Security, Economy & Finance, Technology, Business, Emergencies, Other'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "F. Enable and disable monitoring",
+      "description": "Ends with both test accounts paused. Enable is briefly tested and then reversed.",
+      "item": [
+        {
+          "name": "Disable Nitter test account",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testAccountId}}/disable"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\",\"testAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const account = pm.response.json().account;",
+                  "pm.test('Account is disabled and paused', function () {",
+                  "  pm.expect(account.enabled).to.eql(false);",
+                  "  pm.expect(account.monitoringStatus).to.eql(\"paused\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Nitter account is disabled",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testAccountId}}"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\",\"testAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const account = pm.response.json().account;",
+                  "pm.test('Disabled account is paused', function () { pm.expect(account.enabled).to.eql(false); pm.expect(account.monitoringStatus).to.eql('paused'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enable Nitter test account",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testAccountId}}/enable"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\",\"testAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const account = pm.response.json().account;",
+                  "pm.test('Account is enabled and active', function () {",
+                  "  pm.expect(account.enabled).to.eql(true);",
+                  "  pm.expect(account.monitoringStatus).to.eql(\"active\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Nitter account is enabled",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testAccountId}}"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\",\"testAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const account = pm.response.json().account;",
+                  "pm.test('Enabled account is active', function () { pm.expect(account.enabled).to.eql(true); pm.expect(account.monitoringStatus).to.eql('active'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pause Nitter account after enable check",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testAccountId}}/disable"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\",\"testAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const account = pm.response.json().account;",
+                  "pm.test('Account is disabled and paused', function () {",
+                  "  pm.expect(account.enabled).to.eql(false);",
+                  "  pm.expect(account.monitoringStatus).to.eql(\"paused\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Mock test account remains paused",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testMockAccountId}}"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\",\"testMockAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const account = pm.response.json().account;",
+                  "pm.test('Mock test account stays paused', function () { pm.expect(account.enabled).to.eql(false); pm.expect(account.monitoringStatus).to.eql('paused'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Disable without authentication",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testAccountId}}/disable"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"testAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Error response matches the implementation\", function () { pm.expect(pm.response.json()).to.eql({ error: \"Authentication required\" }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enable without authentication",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testAccountId}}/enable"
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"testAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Error response matches the implementation\", function () { pm.expect(pm.response.json()).to.eql({ error: \"Authentication required\" }); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "G. Review / manual cleanup",
+      "description": "The API has no DELETE endpoint. These are read-only confirmations; manually delete only exact collection-created account IDs after review.",
+      "item": [
+        {
+          "name": "Review Nitter test account — manual cleanup only",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testAccountId}}"
+            },
+            "description": "There is no DELETE endpoint. Verify this is the generated account before removing it manually in MongoDB Compass."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\",\"testAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const account = pm.response.json().account;",
+                  "pm.test('Review exact generated ID and paused state', function () {",
+                  "  pm.expect(account._id).to.eql(pm.collectionVariables.get('testAccountId'));",
+                  "  pm.expect(account.username).to.eql(pm.collectionVariables.get('testUsername'));",
+                  "  pm.expect(account.enabled).to.eql(false);",
+                  "  pm.expect(account.monitoringStatus).to.eql('paused');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Review Mock test account — manual cleanup only",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwtToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/accounts/{{testMockAccountId}}"
+            },
+            "description": "There is no DELETE endpoint. Verify the generated ID and username before manual removal in MongoDB Compass."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "for (const name of [\"jwtToken\",\"testMockAccountId\"]) {",
+                  "  if (!pm.collectionVariables.get(name)) throw new Error('Run the matching create request first; missing collection variable: ' + name);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const account = pm.response.json().account;",
+                  "pm.test('Review exact generated ID and paused state', function () {",
+                  "  pm.expect(account._id).to.eql(pm.collectionVariables.get('testMockAccountId'));",
+                  "  pm.expect(account.username).to.eql(pm.collectionVariables.get('testMockUsername'));",
+                  "  pm.expect(account.enabled).to.eql(false);",
+                  "  pm.expect(account.monitoringStatus).to.eql('paused');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+<main class="login-screen">
+  <div class="login-aside" aria-hidden="true">
+    <div class="aside-brand"><span class="brand-mark"><i class="bi bi-broadcast-pin"></i></span><span>BREAKING NEWS MONITOR</span></div>
+    <div class="aside-message">
+      <div class="eyebrow"><span></span> EDITORIAL MONITORING DESK</div>
+      <h2>Stay close<br>to the signal.</h2>
+      <p>A focused workspace for monitoring public sources and keeping your team informed.</p>
+    </div>
+    <div class="aside-footer"><span>PRIVATE ADMIN WORKSPACE</span><span>SECURE SESSION</span></div>
+  </div>
+
+  <section class="login-main" aria-labelledby="login-title">
+    <a class="mobile-brand" routerLink="/login"><span class="brand-mark"><i class="bi bi-broadcast-pin"></i></span><span>BREAKING NEWS MONITOR</span></a>
+    <div class="login-panel">
+      <div class="login-kicker">ADMINISTRATOR ACCESS</div>
+      <h1 id="login-title">Welcome back</h1>
+      <p class="login-subtitle">Sign in to continue to your monitoring desk.</p>
+
+      @if (errorMessage()) {
+        <div class="error-banner" role="alert"><i class="bi bi-exclamation-circle"></i><span>{{ errorMessage() }}</span></div>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <div class="field-group">
+          <label for="username">Username</label>
+          <div class="input-wrap" [class.invalid]="form.controls.username.invalid && form.controls.username.touched">
+            <i class="bi bi-person"></i>
+            <input id="username" type="text" formControlName="username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Enter your admin username" [attr.aria-invalid]="form.controls.username.invalid && form.controls.username.touched">
+          </div>
+          @if (form.controls.username.invalid && form.controls.username.touched) {
+            <small class="field-error">Enter your username.</small>
+          }
+        </div>
+
+        <div class="field-group password-group">
+          <label for="password">Password</label>
+          <div class="input-wrap" [class.invalid]="form.controls.password.invalid && form.controls.password.touched">
+            <i class="bi bi-lock"></i>
+            <input id="password" [type]="passwordVisible() ? 'text' : 'password'" formControlName="password" autocomplete="current-password" placeholder="Enter your password" [attr.aria-invalid]="form.controls.password.invalid && form.controls.password.touched">
+            <button class="visibility-toggle" type="button" [attr.aria-label]="passwordVisible() ? 'Hide password' : 'Show password'" [attr.aria-pressed]="passwordVisible()" (click)="togglePasswordVisibility()">
+              <i [class]="passwordVisible() ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+            </button>
+          </div>
+          @if (form.controls.password.invalid && form.controls.password.touched) {
+            <small class="field-error">Enter your password.</small>
+          }
+        </div>
+
+        <button class="submit-button" type="submit" [disabled]="submitting()">
+          @if (submitting()) { <span class="spinner" aria-hidden="true"></span><span>Signing in</span> }
+          @else { <span>Sign in</span><i class="bi bi-arrow-right"></i> }
+        </button>
+      </form>
+
+      <div class="login-footnote"><i class="bi bi-shield-lock"></i><span>Your session is stored only for this browser session.</span></div>
+    </div>
+    <div class="main-footer"><span>BREAKING NEWS MONITOR</span><span>ADMIN ACCESS</span></div>
+  </section>
+</main>

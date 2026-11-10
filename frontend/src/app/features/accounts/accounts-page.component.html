@@ -1,0 +1,155 @@
+<div class="accounts-page">
+  <header class="page-heading">
+    <div>
+      <div class="eyebrow"><span></span> SOURCE ROSTER</div>
+      <h2>Monitored accounts</h2>
+      <p>Manage the public X accounts configured in the monitoring workspace.</p>
+    </div>
+    <div class="heading-actions">
+      <button class="refresh-button" type="button" [disabled]="loading()" (click)="loadAccounts()">
+        @if (loading()) { <span class="spinner" aria-hidden="true"></span> }
+        @else { <i class="bi bi-arrow-clockwise"></i> }
+        Refresh
+      </button>
+      <button class="add-button" type="button" (click)="openCreateForm()"><i class="bi bi-plus-lg"></i> Add account</button>
+    </div>
+  </header>
+
+  @if (successMessage()) { <div class="success-banner" role="status"><i class="bi bi-check-circle"></i>{{ successMessage() }}</div> }
+  @if (mutationError()) { <div class="mutation-error" role="alert"><i class="bi bi-exclamation-circle"></i>{{ mutationError() }}</div> }
+
+  @if (formOpen()) {
+    <div class="modal-backdrop" (click)="closeForm()">
+      <section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-dialog-title" (click)="$event.stopPropagation()">
+        <header class="dialog-heading">
+          <div><span class="eyebrow"><span></span> ACCOUNT SETTINGS</span><h3 id="account-dialog-title">{{ editingAccount() ? 'Edit account' : 'Add monitored account' }}</h3></div>
+          <button class="icon-button" type="button" aria-label="Close form" [disabled]="saving()" (click)="closeForm()"><i class="bi bi-x-lg"></i></button>
+        </header>
+        <form [formGroup]="form" (ngSubmit)="submitForm()" novalidate>
+          <label for="account-username">X username <span>*</span></label>
+          <div class="username-input"><span>@</span><input id="account-username" type="text" formControlName="username" autocomplete="off" placeholder="Reuters" [attr.aria-invalid]="fieldInvalid('username')" /></div>
+          @if (fieldInvalid('username')) { <small class="field-error">Enter 1–15 letters, numbers, or underscores.</small> }
+
+          <label for="account-display-name">Display name <small>Optional</small></label>
+          <input id="account-display-name" type="text" formControlName="displayName" maxlength="120" placeholder="Organization or person" />
+          @if (fieldInvalid('displayName')) { <small class="field-error">Display name must be 120 characters or fewer.</small> }
+
+          <div class="form-row">
+            <div><label for="account-category">Category</label><select id="account-category" formControlName="category">@for (category of categories; track category) { <option [value]="category">{{ category }}</option> }</select></div>
+            <div><label for="account-provider">Provider</label><select id="account-provider" formControlName="providerName"><option value="">Backend default</option><option value="nitter">Nitter</option><option value="mock">Mock</option></select></div>
+          </div>
+          @if (!editingAccount()) { <p class="activation-note"><i class="bi bi-info-circle"></i> New accounts start enabled. Nitter establishes a baseline on the first successful poll to suppress older posts.</p> }
+          @if (mutationError()) { <div class="form-error" role="alert">{{ mutationError() }}</div> }
+          <footer class="dialog-actions"><button class="cancel-button" type="button" [disabled]="saving()" (click)="closeForm()">Cancel</button><button class="add-button" type="submit" [disabled]="saving() || form.invalid">@if (saving()) { <span class="spinner"></span> Saving… } @else { {{ editingAccount() ? 'Save changes' : 'Add account' }} }</button></footer>
+        </form>
+      </section>
+    </div>
+  }
+
+  <section class="roster-panel" aria-label="Monitored account list">
+    <div class="roster-toolbar">
+      <div class="count-label">
+        <span class="toolbar-mark"></span>
+        @if (loading()) { <span>Loading account roster</span> }
+        @else if (errorMessage()) { <span>Account roster unavailable</span> }
+        @else { <span>{{ accounts().length }} {{ accounts().length === 1 ? 'account' : 'accounts' }}</span> }
+      </div>
+      <span class="source-note">SOURCE: BACKEND ACCOUNT API</span>
+    </div>
+
+    @if (loading()) {
+      <div class="state-panel" role="status">
+        <span class="large-spinner" aria-hidden="true"></span>
+        <strong>Loading monitored accounts</strong>
+        <p>Fetching the current account roster.</p>
+      </div>
+    } @else if (errorMessage()) {
+      <div class="state-panel error-state" role="alert">
+        <span class="state-icon"><i class="bi bi-exclamation-circle"></i></span>
+        <strong>Could not load accounts</strong>
+        <p>{{ errorMessage() }}</p>
+        <button class="retry-button" type="button" (click)="loadAccounts()">Try again <i class="bi bi-arrow-right"></i></button>
+      </div>
+    } @else if (accounts().length === 0) {
+      <div class="state-panel" role="status">
+        <span class="state-icon"><i class="bi bi-broadcast"></i></span>
+        <strong>No monitored accounts yet</strong>
+        <p>The backend returned an empty account list.</p>
+      </div>
+    } @else {
+      <div class="table-scroll">
+        <table class="accounts-table">
+          <thead>
+            <tr>
+              <th scope="col">ACCOUNT</th>
+              <th scope="col">CATEGORY</th>
+              <th scope="col">PROVIDER</th>
+              <th scope="col">MONITORING</th>
+              <th scope="col">ENABLED</th>
+              <th scope="col">LAST SUCCESSFUL FETCH</th>
+              <th scope="col">LATEST POLL HEALTH</th>
+              <th scope="col">ADDED</th>
+              <th scope="col">ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (account of accounts(); track account._id) {
+              <tr>
+                <td>
+                  <div class="account-cell">
+                    <span class="account-symbol"><i class="bi bi-at"></i></span>
+                    <span class="account-identity">
+                      <strong>{{ account.displayName || '@' + account.username }}</strong>
+                      <small>@{{ account.username }}</small>
+                    </span>
+                  </div>
+                </td>
+                <td><span class="category-label">{{ account.category }}</span></td>
+                <td><span class="provider-label">{{ account.providerName }}</span></td>
+                <td>
+                  <span class="status-label" [class.status-active]="account.monitoringStatus === 'active'" [class.status-paused]="account.monitoringStatus === 'paused'" [class.status-error]="account.monitoringStatus === 'error'">
+                    <i></i>{{ account.monitoringStatus }}
+                  </span>
+                </td>
+                <td>
+                  <span class="enabled-label" [class.is-disabled]="!account.enabled">
+                    <i></i>{{ account.enabled ? 'Enabled' : 'Disabled' }}
+                  </span>
+                </td>
+                <td class="date-cell">@if (hasValidTimestamp(account.lastSuccessfulFetchAt)) { {{ account.lastSuccessfulFetchAt | date:'MMM d, y · HH:mm' }} } @else { Never }</td>
+                <td class="health-cell">
+                  <details class="health-details">
+                    <summary>
+                      <span class="freshness-badge" [class.freshness-fresh]="feedFreshness(account) === 'fresh'" [class.freshness-stale]="feedFreshness(account) === 'stale'" [class.freshness-empty]="feedFreshness(account) === 'empty'" [class.freshness-unknown]="feedFreshness(account) === 'unknown'">{{ freshnessLabel(account) }}</span>
+                      <span class="poll-outcome" [class.poll-failed]="account.pollHealth?.lastStatus === 'failed'">{{ pollStatusLabel(account) }}</span>
+                    </summary>
+                    <div class="health-details-panel">
+                      <div class="freshness-note">@switch (feedFreshness(account)) {
+                        @case ('fresh') { Newest returned post is within the configured freshness window. }
+                        @case ('stale') { Newest returned post is older than the configured freshness window. }
+                        @case ('empty') { The latest successful feed contained no entries; this is not a provider failure. }
+                        @default { Feed freshness cannot be determined from the available timestamps. }
+                      }</div>
+                      <dl>
+                        <div><dt>Poll outcome</dt><dd>{{ pollStatusLabel(account) }}</dd></div>
+                        <div><dt>Last poll completed</dt><dd>@if (hasValidTimestamp(account.pollHealth?.lastCompletedAt)) { {{ account.pollHealth?.lastCompletedAt | date:'MMM d, y · HH:mm:ss' }} } @else { Not available }</dd></div>
+                        <div><dt>Entries returned</dt><dd>{{ account.pollHealth?.returnedEntryCount ?? '—' }}</dd></div>
+                        <div><dt>Posts inserted</dt><dd>{{ account.pollHealth?.insertedPostCount ?? '—' }}</dd></div>
+                        <div><dt>Duplicates</dt><dd>{{ account.pollHealth?.duplicatePostCount ?? '—' }}</dd></div>
+                        <div><dt>Poll duration</dt><dd>{{ account.pollHealth?.lastDurationMs != null ? (account.pollHealth.lastDurationMs + ' ms') : '—' }}</dd></div>
+                      </dl>
+                      @if (account.pollHealth?.lastErrorCode) { <p class="provider-error-code">Provider error code: <code>{{ account.pollHealth.lastErrorCode }}</code></p> }
+                    </div>
+                  </details>
+                </td>
+                <td class="date-cell">{{ account.createdAt | date:'MMM d, y' }}</td>
+                <td><div class="row-actions"><button type="button" class="text-action" (click)="openEditForm(account)">Edit</button><button type="button" class="text-action" [disabled]="rowBusyId() === account._id" (click)="toggleEnabled(account)">@if (rowBusyId() === account._id) { Updating… } @else { {{ account.enabled ? 'Disable' : 'Enable' }} }</button></div></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="table-footer"><span>Showing {{ accounts().length }} {{ accounts().length === 1 ? 'account' : 'accounts' }}</span><span>ACCOUNT MANAGEMENT</span></div>
+    }
+  </section>
+</div>

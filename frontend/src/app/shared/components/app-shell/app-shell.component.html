@@ -1,0 +1,25 @@
+<div class="console-layout">
+  <button class="mobile-scrim" [class.visible]="sidebarOpen()" type="button" aria-label="Close navigation" (click)="closeSidebar()"></button>
+  <aside class="sidebar" [class.open]="sidebarOpen()" aria-label="Application sidebar">
+    <a class="brand" routerLink="/dashboard" (click)="closeSidebar()" aria-label="Breaking News Monitor overview"><span class="brand-mark"><i class="bi bi-broadcast-pin"></i></span><span class="brand-copy"><strong>THE SIGNAL DESK</strong><small>BREAKING NEWS MONITOR</small></span></a>
+    <div class="nav-label">MONITOR</div>
+    <nav class="side-nav" aria-label="Main navigation">
+      <a routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeSidebar()"><i class="bi bi-grid-1x2"></i><span>Overview</span><span class="active-mark"></span></a>
+      <a routerLink="/accounts" routerLinkActive="active" (click)="closeSidebar()"><i class="bi bi-broadcast"></i><span>Monitored accounts</span><span class="active-mark"></span></a>
+      <a routerLink="/posts" routerLinkActive="active" (click)="closeSidebar()"><i class="bi bi-lightning-charge"></i><span>Collected posts</span><span class="active-mark"></span></a>
+    </nav>
+    <div class="nav-label nav-label-spaced">WORKSPACE</div>
+    <nav class="side-nav" aria-label="Workspace navigation">
+      <a routerLink="/notifications" routerLinkActive="active" (click)="closeSidebar()"><i class="bi bi-send"></i><span>Notification history</span><span class="active-mark"></span></a>
+      <a routerLink="/settings" routerLinkActive="active" (click)="closeSidebar()"><i class="bi bi-sliders2"></i><span>Settings</span><span class="active-mark"></span></a>
+    </nav>
+    <div class="sidebar-spacer"></div>
+    <div class="workspace-state"><span class="state-icon"><i class="bi bi-shield-check"></i></span><div><strong>Private workspace</strong><small>Administrator session</small></div></div>
+    <div class="admin-area"><div class="admin-avatar">A</div><div class="admin-copy"><strong>Administrator</strong><small>Signed in</small></div><button class="logout-button" type="button" title="Sign out" aria-label="Sign out" (click)="logout()"><i class="bi bi-box-arrow-right"></i></button></div>
+  </aside>
+  <main class="main-column">
+    <header class="topbar"><div class="heading-group"><button class="menu-toggle" type="button" aria-label="Toggle navigation" (click)="toggleSidebar()"><i class="bi bi-list"></i></button><div class="breadcrumb"><span>{{ pageSection() }}</span><i class="bi bi-chevron-right"></i><strong>{{ pageTitle() }}</strong></div><h1>{{ pageTitle() }}</h1></div><div class="topbar-tools"><div class="connection-status"><span class="status-lamp"></span><span>Admin session active</span></div><app-notification-center /><span class="topbar-brand-mark"><i class="bi bi-broadcast"></i></span></div></header>
+    <section class="page-content"><router-outlet /></section>
+    <footer class="console-footer"><span>THE SIGNAL DESK</span><span>PRIVATE ADMIN WORKSPACE</span></footer>
+  </main>
+</div>

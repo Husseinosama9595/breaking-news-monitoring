@@ -1,0 +1,29 @@
+{
+  "name": "breaking-news-monitor-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test",
+    "e2e:telegram": "node scripts/e2e-telegram-pipeline.js",
+    "smoke:nitter": "node scripts/nitter-smoke.js"
+  },
+  "dependencies": {
+    "bullmq": "^5.58.5",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "fast-xml-parser": "^5.12.0",
+    "helmet": "^8.1.0",
+    "ioredis": "^5.7.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.18.0",
+    "zod": "^4.1.5"
+  }
+}
